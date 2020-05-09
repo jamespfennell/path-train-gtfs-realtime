@@ -156,9 +156,9 @@ func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	for apiStopId, trains := range apiStopIdToApiTrains {
 		for _, train := range trains {
 			tripId := "trip_id" // TODO: should be random
-			tripUpdate := convertApiTrainToTripUpdate(train, tripId, apiStopId)
+			tripUpdate := convertApiTrainToTripUpdate(train, tripId, apiStopIdToStopId[apiStopId])
 			feedEntity := gtfs.FeedEntity{
-				Id:         nil,
+				Id:         &tripId,
 				TripUpdate: &tripUpdate,
 			}
 			feedMessage.Entity = append(feedMessage.Entity, &feedEntity)
