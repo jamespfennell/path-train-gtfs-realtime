@@ -115,7 +115,7 @@ func main() {
 	// _ = updateTrainsAtAllStations()
 	feedMessage := buildGtfsRealtimeFeedMessage()
 	out, _ := proto.Marshal(&feedMessage)
-	ioutil.WriteFile("path.gtfsrt", out, 0644)
+	ioutil.WriteFile("path.gtfsrt", out, 0644)  // TODO: env var for the file path
 	fmt.Println(apiStopIdToApiTrains)
 }
 
@@ -144,7 +144,7 @@ func initializeApiIdMaps() {
 func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	gtfsVersion := "0.2"
 	incrementality := gtfs.FeedHeader_FULL_DATASET
-	currentTimestamp := uint64(405)
+	currentTimestamp := uint64(405)  // TODO: implement
 	feedMessage := gtfs.FeedMessage{
 		Header: &gtfs.FeedHeader{
 			GtfsRealtimeVersion: &gtfsVersion,
@@ -192,6 +192,7 @@ func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) g
 	}
 }
 
+// TODO: implement
 func convertApiTimeStringToTimestamp(timeString string) int64 {
 	return int64(4)
 }
