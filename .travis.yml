@@ -2,3 +2,7 @@ language: golang
 
 script:
   - docker build . -t jamespfennell/path-train-gtfs-realtime:latest
+
+after_success:
+  - docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
+  - docker push jamespfennell/path-train-gtfs-realtime:latest
