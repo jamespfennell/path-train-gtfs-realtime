@@ -131,7 +131,7 @@ func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[str
 func main() {
 	fmt.Println("Starting up.")
 	initializeApiIdMaps()
-	outputPath, envVarSet := os.LookupEnv("GTFS_REALTIME_OUTPUT_PATH")
+	outputPath, envVarSet := os.LookupEnv("PATH_GTFS_REALTIME_OUTPUT_PATH")
 	if !envVarSet {
 		outputPath = "path.gtfsrt"
 	}
