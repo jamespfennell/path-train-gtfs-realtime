@@ -4,205 +4,157 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
-	"github.com/golang/protobuf/proto"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 )
-
-var apiStopToStopId = map[string]string{
-
-}
-
-const apiUrlRoutes = "https://path.api.razza.dev/v1/routes/"
-const apiUrlStations = "https://path.api.razza.dev/v1/stations/"
-
-// TODO: see if this needs to be flipped
-var apiDirectionToDirectionId = map[string]uint32{
-	"TO_NY": uint32(0),
-	"TO_NJ": uint32(1),
-}
-var myJsonString = `
-{
-"upcomingTrains": [
-{
-"lineName": "World Trade Center",
-"lineColors": [
-"#D93A30"
-],
-"projectedArrival": "2020-05-09T01:41:50Z",
-"lastUpdated": "2020-05-09T01:38:47Z",
-"status": "ON_TIME",
-"headsign": "World Trade Center",
-"route": "NWK_WTC",
-"routeDisplayName": "Newark - World Trade Center",
-"direction": "TO_NY"
-},
-{
-"lineName": "33rd Street",
-"lineColors": [
-"#FF9900"
-],
-"projectedArrival": "2020-05-09T01:43:15Z",
-"lastUpdated": "2020-05-09T01:38:47Z",
-"status": "ON_TIME",
-"headsign": "33rd Street",
-"route": "JSQ_33",
-"routeDisplayName": "Journal Square - 33rd Street",
-"direction": "TO_NY"
-},
-{
-"lineName": "Newark",
-"lineColors": [
-"#D93A30"
-],
-"projectedArrival": "2020-05-09T01:38:47Z",
-"lastUpdated": "2020-05-09T01:38:47Z",
-"status": "ARRIVING_NOW",
-"headsign": "Newark",
-"route": "NWK_WTC",
-"routeDisplayName": "World Trade Center - Newark",
-"direction": "TO_NJ"
-},
-{
-"lineName": "Journal Square",
-"lineColors": [
-"#FF9900"
-],
-"projectedArrival": "2020-05-09T01:43:32Z",
-"lastUpdated": "2020-05-09T01:38:47Z",
-"status": "ON_TIME",
-"headsign": "Journal Square",
-"route": "JSQ_33",
-"routeDisplayName": "33rd Street - Journal Square",
-"direction": "TO_NJ"
-}
-]
-}
-`
-
-
-var routeJson = `
-{
-  "routes": [
-    {
-      "route": "JSQ_33_HOB",
-      "id": "1024",
-      "name": "Journal Square - 33rd Street (via Hoboken)",
-      "color": "ff9900",
-      "lines": [
-        {
-          "displayName": "33rd Street (via Hoboken) - Journal Square",
-          "headsign": "Journal Square via Hoboken",
-          "direction": "TO_NJ"
-        },
-        {
-          "displayName": "Journal Square - 33rd Street (via Hoboken)",
-          "headsign": "33rd via Hoboken",
-          "direction": "TO_NY"
-        }
-      ]
-    }
-  ]
-}
-`
-
-
 
 type apiTrain struct {
 	ProjectedArrival string
 	LastUpdated      string
 	Route            string
 	Direction        string
-	Stop             string
 }
 
-type apiRealtimeResponse struct {
-	Trains []apiTrain `json:"upcomingTrains"`
-}
-// https://path.api.razza.dev/v1/routes/
+var apiStopIdToStopId = map[string]string{}
+var apiRouteIdToRouteId = map[string]string{}
+var apiStopIdToApiTrains = map[string][]apiTrain{}
 
-func getApiContent(url string) []byte {
-	resp, _ := http.Get(url) // TODO: handle error
+const apiUrlRoutes = "https://path.api.razza.dev/v1/routes/"
+const apiUrlStations = "https://path.api.razza.dev/v1/stations/"
+const apiUrlRealtime = "https://path.api.razza.dev/v1/stations/%s/realtime/"
+
+// TODO: see if this needs to be flipped by looking at the GTFS static
+var apiDirectionToDirectionId = map[string]uint32{
+	"TO_NY": uint32(0),
+	"TO_NJ": uint32(1),
+}
+
+func updateTrainsAtStation(station string) (err error) {
+	type apiRealtimeResponse struct {
+		Trains []apiTrain `json:"upcomingTrains"`
+	}
+	realtimeApiContent, err := getApiContent(fmt.Sprintf(apiUrlRealtime, station))
+	if err != nil {
+		return
+	}
+	response := apiRealtimeResponse{}
+	err = json.Unmarshal(realtimeApiContent, &response)
+	if err != nil {
+		return
+	}
+	apiStopIdToApiTrains[station] = response.Trains
+	return
+}
+
+func updateTrainsAtAllStations() (err error) {
+	for apiStopId := range apiStopIdToStopId {
+		err = updateTrainsAtStation(apiStopId)
+	}
+	return
+}
+
+func getApiContent(url string) (bytes []byte, err error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	// TODO: handle error properly
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-	return body
+	return ioutil.ReadAll(resp.Body)
 }
 
-func buildApiRouteIdToRouteId(routeApiContent []byte) (apiRouteIdToRouteId map[string]string) {
+func buildApiRouteIdToRouteId(routeApiContent []byte) (apiRouteIdToRouteId map[string]string, err error) {
 	type apiRoute struct {
 		ApiId string `json:"route"`
-		Id string
+		Id    string
 	}
 	type apiRoutesResponse struct {
 		Routes []apiRoute `json:"routes"`
 	}
-	r := apiRoutesResponse{}
-	json.Unmarshal(routeApiContent, &r)  // TODO: handle error
+	response := apiRoutesResponse{}
+	err = json.Unmarshal(routeApiContent, &response)
+	if err != nil {
+		return
+	}
 	apiRouteIdToRouteId = map[string]string{}
-	for _, apiRoute:= range r.Routes {
+	for _, apiRoute := range response.Routes {
 		apiRouteIdToRouteId[apiRoute.ApiId] = apiRoute.Id
 	}
 	return
 }
 
-
-func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[string]string) {
+func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[string]string, err error) {
 	type apiStation struct {
 		ApiId string `json:"station"`
-		Id string
+		Id    string
 	}
 	type apiStationsResponse struct {
 		Stations []apiStation `json:"stations"`
 	}
-	r := apiStationsResponse{}
-	json.Unmarshal(stationApiContent, &r)  // TODO: handle error
-	apiStopIdToStopId = map[string]string{}
-	for _, station:= range r.Stations {
-		apiStopIdToStopId[strings.ToLower(station.ApiId)] = station.Id
-	}
-	fmt.Println(apiStopIdToStopId)
-	return
-}
-
-
-
-
-func main() {
-
-	r := apiRealtimeResponse{}
-	err := json.Unmarshal([]byte(myJsonString), &r)
-	r.Trains[0].Stop = "a"
+	response := apiStationsResponse{}
+	err = json.Unmarshal(stationApiContent, &response)
 	if err != nil {
 		return
 	}
-	b := "str"
-	c := gtfs.FeedHeader_FULL_DATASET
-	t := uint64(405)
-	a := gtfs.FeedMessage{
-		Header: &gtfs.FeedHeader{
-			GtfsRealtimeVersion: &b,
-			Incrementality:      &c,
-			Timestamp:           &t,
-		},
+	apiStopIdToStopId = map[string]string{}
+	for _, station := range response.Stations {
+		apiStopIdToStopId[strings.ToLower(station.ApiId)] = station.Id
 	}
-
-	fmt.Println("hello world")
-	fmt.Println(r)
-	fmt.Println(a)
-	out, err := proto.Marshal(&a)
-	fmt.Println(out)
-	// body := getApiContent("https://path.api.razza.dev/v1/routes/") // TODO: handle error
-	// fmt.Println(buildApiRouteIdToRouteId(body))
-	// body := getApiContent(apiUrlStations)
-	// buildApiStopIdToStopId(body)
+	return
 }
 
-func convertApiTrainToTripUpdate(train apiTrain) gtfs.TripUpdate {
+func main() {
+	apiStopIdToApiTrains["harrison"] = []apiTrain{}
+	_ = updateTrainsAtStation("harrison")
+	fmt.Println(apiStopIdToApiTrains)
+	/*
+		b := "str"
+		c := gtfs.FeedHeader_FULL_DATASET
+		t := uint64(405)
+		a := gtfs.FeedMessage{
+			Header: &gtfs.FeedHeader{
+				GtfsRealtimeVersion: &b,
+				Incrementality:      &c,
+				Timestamp:           &t,
+			},
+		}
+
+		// out, err := proto.Marshal(&a)
+		// fmt.Println(out)
+		initializeIdMaps()
+		fmt.Println(apiStopIdToStopId)
+		fmt.Println(apiRouteIdToRouteId)
+	*/
+}
+
+func initializeApiIdMaps() {
+	routesContent, err := getApiContent(apiUrlRoutes)
+	if err != nil {
+		os.Exit(1)
+	}
+	apiRouteIdToRouteId, err = buildApiRouteIdToRouteId(routesContent)
+	if err != nil {
+		os.Exit(2)
+	}
+	stationsContent, err := getApiContent(apiUrlStations)
+	if err != nil {
+		os.Exit(3)
+	}
+	apiStopIdToStopId, err = buildApiStopIdToStopId(stationsContent)
+	if err != nil {
+		os.Exit(4)
+	}
+	for apiStopId := range apiStopIdToStopId {
+		apiStopIdToApiTrains[apiStopId] = []apiTrain{}
+	}
+}
+
+func convertApiTrainToTripUpdate(train apiTrain, stopId string) gtfs.TripUpdate {
 	lastUpdated := uint64(convertApiTimeStringToTimestamp(train.LastUpdated))
 	arrivalTime := convertApiTimeStringToTimestamp(train.ProjectedArrival)
-	stopId := apiStopToStopId[train.Stop]
-	routeId := "a" //apiRouteToRouteId[train.Route]
+	routeId := apiRouteIdToRouteId[train.Route]
 	directionId := apiDirectionToDirectionId[train.Direction]
 	stopTimeUpdate := gtfs.TripUpdate_StopTimeUpdate{
 		StopSequence: nil,
