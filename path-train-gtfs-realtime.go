@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type apiTrain struct {
@@ -109,14 +110,38 @@ func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[str
 }
 
 func main() {
-	// apiStopIdToApiTrains["harrison"] = []apiTrain{}
+	fmt.Println("Starting up.")
 	initializeApiIdMaps()
-	_ = updateTrainsAtStation("harrison")
-	// _ = updateTrainsAtAllStations()
+	outputPath, envVarSet := os.LookupEnv("GTFS_REALTIME_OUTPUT_PATH")
+	if !envVarSet {
+		outputPath = "path.gtfsrt"
+	}
+	fmt.Println(fmt.Sprintf("Feed will be written to '%s'.", outputPath))
+	fmt.Println("Ready.")
+	for {
+		run(outputPath)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func run(outputPath string) {
+	fmt.Println("Updating GTFS Realtime feed.")
+	err := updateTrainsAtAllStations()
+	if err != nil {
+		fmt.Println("There was an error while retrieving the data; update will continue with some data stale.")
+	}
 	feedMessage := buildGtfsRealtimeFeedMessage()
-	out, _ := proto.Marshal(&feedMessage)
-	ioutil.WriteFile("path.gtfsrt", out, 0644)  // TODO: env var for the file path
-	fmt.Println(apiStopIdToApiTrains)
+	out, err := proto.Marshal(&feedMessage)
+	if err != nil {
+		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
+		return
+	}
+	err = ioutil.WriteFile(outputPath, out, 0644)
+	if err != nil {
+		fmt.Println("Update failed: there was an error writing the GTFS Realtime file to disk.")
+		return
+	}
+	fmt.Println("Update successful.")
 }
 
 func initializeApiIdMaps() {
@@ -144,7 +169,7 @@ func initializeApiIdMaps() {
 func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	gtfsVersion := "0.2"
 	incrementality := gtfs.FeedHeader_FULL_DATASET
-	currentTimestamp := uint64(405)  // TODO: implement
+	currentTimestamp := uint64(405) // TODO: implement
 	feedMessage := gtfs.FeedMessage{
 		Header: &gtfs.FeedHeader{
 			GtfsRealtimeVersion: &gtfsVersion,
