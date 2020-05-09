@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
+	"github.com/golang/protobuf/proto"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -49,6 +50,7 @@ func updateTrainsAtStation(station string) (err error) {
 }
 
 func updateTrainsAtAllStations() (err error) {
+	// TODO: async?
 	for apiStopId := range apiStopIdToStopId {
 		err = updateTrainsAtStation(apiStopId)
 	}
@@ -56,6 +58,7 @@ func updateTrainsAtAllStations() (err error) {
 }
 
 func getApiContent(url string) (bytes []byte, err error) {
+	// TODO: timeout?
 	resp, err := http.Get(url)
 	if err != nil {
 		return
@@ -106,27 +109,14 @@ func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[str
 }
 
 func main() {
-	apiStopIdToApiTrains["harrison"] = []apiTrain{}
+	// apiStopIdToApiTrains["harrison"] = []apiTrain{}
+	initializeApiIdMaps()
 	_ = updateTrainsAtStation("harrison")
+	// _ = updateTrainsAtAllStations()
+	feedMessage := buildGtfsRealtimeFeedMessage()
+	out, _ := proto.Marshal(&feedMessage)
+	ioutil.WriteFile("path.gtfsrt", out, 0644)
 	fmt.Println(apiStopIdToApiTrains)
-	/*
-		b := "str"
-		c := gtfs.FeedHeader_FULL_DATASET
-		t := uint64(405)
-		a := gtfs.FeedMessage{
-			Header: &gtfs.FeedHeader{
-				GtfsRealtimeVersion: &b,
-				Incrementality:      &c,
-				Timestamp:           &t,
-			},
-		}
-
-		// out, err := proto.Marshal(&a)
-		// fmt.Println(out)
-		initializeIdMaps()
-		fmt.Println(apiStopIdToStopId)
-		fmt.Println(apiRouteIdToRouteId)
-	*/
 }
 
 func initializeApiIdMaps() {
@@ -151,7 +141,33 @@ func initializeApiIdMaps() {
 	}
 }
 
-func convertApiTrainToTripUpdate(train apiTrain, stopId string) gtfs.TripUpdate {
+func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
+	gtfsVersion := "0.2"
+	incrementality := gtfs.FeedHeader_FULL_DATASET
+	currentTimestamp := uint64(405)
+	feedMessage := gtfs.FeedMessage{
+		Header: &gtfs.FeedHeader{
+			GtfsRealtimeVersion: &gtfsVersion,
+			Incrementality:      &incrementality,
+			Timestamp:           &currentTimestamp,
+		},
+		Entity: []*gtfs.FeedEntity{},
+	}
+	for apiStopId, trains := range apiStopIdToApiTrains {
+		for _, train := range trains {
+			tripId := "trip_id" // TODO: should be random
+			tripUpdate := convertApiTrainToTripUpdate(train, tripId, apiStopId)
+			feedEntity := gtfs.FeedEntity{
+				Id:         nil,
+				TripUpdate: &tripUpdate,
+			}
+			feedMessage.Entity = append(feedMessage.Entity, &feedEntity)
+		}
+	}
+	return feedMessage
+}
+
+func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) gtfs.TripUpdate {
 	lastUpdated := uint64(convertApiTimeStringToTimestamp(train.LastUpdated))
 	arrivalTime := convertApiTimeStringToTimestamp(train.ProjectedArrival)
 	routeId := apiRouteIdToRouteId[train.Route]
@@ -165,7 +181,7 @@ func convertApiTrainToTripUpdate(train apiTrain, stopId string) gtfs.TripUpdate 
 	}
 	return gtfs.TripUpdate{
 		Trip: &gtfs.TripDescriptor{
-			TripId:      nil,
+			TripId:      &tripId,
 			RouteId:     &routeId,
 			DirectionId: &directionId,
 		},
