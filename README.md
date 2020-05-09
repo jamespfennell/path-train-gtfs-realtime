@@ -30,7 +30,7 @@ Env var `GTFS_REALTIME_OUTPUT_PATH`
 
 ## Exit codes
 
-- 1, could not download routes data
-- 2, result was errored
-- 3, could not download stations data
-- 4, result was errored
+- 101, could not download routes data
+- 102, result was errored
+- 103, could not download stations data
+- 104, result was errored

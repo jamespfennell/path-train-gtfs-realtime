@@ -13,6 +13,12 @@ import (
 	"time"
 )
 
+const (
+	apiUrlRoutes   = "https://path.api.razza.dev/v1/routes/"
+	apiUrlStations = "https://path.api.razza.dev/v1/stations/"
+	apiUrlRealtime = "https://path.api.razza.dev/v1/stations/%s/realtime/"
+)
+
 type apiTrain struct {
 	ProjectedArrival string
 	LastUpdated      string
@@ -26,18 +32,70 @@ type apiTrainsAtStation struct {
 	Err          error
 }
 
-var apiStopIdToStopId = map[string]string{}
-var apiRouteIdToRouteId = map[string]string{}
-var apiStopIdToApiTrains = map[string][]apiTrain{}
+type apiData struct {
+	apiStopIdToStopId    map[string]string
+	apiRouteIdToRouteId  map[string]string
+	apiStopIdToApiTrains map[string][]apiTrain
+}
 
-const apiUrlRoutes = "https://path.api.razza.dev/v1/routes/"
-const apiUrlStations = "https://path.api.razza.dev/v1/stations/"
-const apiUrlRealtime = "https://path.api.razza.dev/v1/stations/%s/realtime/"
+func (data apiData) initialize() {
+	routesContent, err := getApiContent(apiUrlRoutes)
+	if err != nil {
+		os.Exit(101)
+	}
+	data.apiRouteIdToRouteId, err = buildApiRouteIdToRouteId(routesContent)
+	if err != nil {
+		os.Exit(102)
+	}
+	stationsContent, err := getApiContent(apiUrlStations)
+	if err != nil {
+		os.Exit(103)
+	}
+	data.apiStopIdToStopId, err = buildApiStopIdToStopId(stationsContent)
+	if err != nil {
+		os.Exit(104)
+	}
+	data.apiStopIdToApiTrains = map[string][]apiTrain{}
+	for apiStopId := range data.apiStopIdToStopId {
+		data.apiStopIdToApiTrains[apiStopId] = []apiTrain{}
+	}
+}
 
-// TODO: see if this needs to be flipped by looking at the GTFS static
-var apiDirectionToDirectionId = map[string]uint32{
-	"TO_NY": uint32(0),
-	"TO_NJ": uint32(1),
+func (data apiData) update() (err error) {
+	updateResults := make(chan apiTrainsAtStation, len(data.apiStopIdToApiTrains))
+	for apiStopId := range data.apiStopIdToStopId {
+		apiStopId := apiStopId
+		go func() { updateResults <- getTrainsAtStation(apiStopId) }()
+	}
+	for range data.apiStopIdToApiTrains {
+		updateResult := <-updateResults
+		if updateResult.Err == nil {
+			data.apiStopIdToApiTrains[updateResult.ApiStationId] = updateResult.ApiTrains
+		} else {
+			err = updateResult.Err
+		}
+	}
+	return
+}
+
+func (data apiData) convertApiDirectionToDirectionId(apiDirection string) (directionId uint32) {
+	if apiDirection == "TO_NY" {
+		directionId = 1
+	} else {
+		directionId = 0
+	}
+	return
+}
+
+func getApiContent(url string) (bytes []byte, err error) {
+	// TODO: timeout?
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	// TODO: handle error properly
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
 }
 
 func getTrainsAtStation(apiStationId string) (result apiTrainsAtStation) {
@@ -60,34 +118,6 @@ func getTrainsAtStation(apiStationId string) (result apiTrainsAtStation) {
 	return
 }
 
-func updateTrainsAtAllStations() (err error) {
-	updateResults := make(chan apiTrainsAtStation, len(apiStopIdToApiTrains))
-	for apiStopId := range apiStopIdToStopId {
-		apiStopId := apiStopId
-		go func() { updateResults <- getTrainsAtStation(apiStopId) }()
-	}
-	for range apiStopIdToApiTrains {
-		updateResult := <-updateResults
-		if updateResult.Err == nil {
-			apiStopIdToApiTrains[updateResult.ApiStationId] = updateResult.ApiTrains
-		} else {
-			err = updateResult.Err
-		}
-	}
-	return
-}
-
-func getApiContent(url string) (bytes []byte, err error) {
-	// TODO: timeout?
-	resp, err := http.Get(url)
-	if err != nil {
-		return
-	}
-	// TODO: handle error properly
-	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
-}
-
 func buildApiRouteIdToRouteId(routeApiContent []byte) (apiRouteIdToRouteId map[string]string, err error) {
 	type apiRoute struct {
 		ApiId string `json:"route"`
@@ -108,84 +138,7 @@ func buildApiRouteIdToRouteId(routeApiContent []byte) (apiRouteIdToRouteId map[s
 	return
 }
 
-func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[string]string, err error) {
-	type apiStation struct {
-		ApiId string `json:"station"`
-		Id    string
-	}
-	type apiStationsResponse struct {
-		Stations []apiStation `json:"stations"`
-	}
-	response := apiStationsResponse{}
-	err = json.Unmarshal(stationApiContent, &response)
-	if err != nil {
-		return
-	}
-	apiStopIdToStopId = map[string]string{}
-	for _, station := range response.Stations {
-		apiStopIdToStopId[strings.ToLower(station.ApiId)] = station.Id
-	}
-	return
-}
-
-func main() {
-	fmt.Println("Starting up.")
-	initializeApiIdMaps()
-	outputPath, envVarSet := os.LookupEnv("PATH_GTFS_REALTIME_OUTPUT_PATH")
-	if !envVarSet {
-		outputPath = "path.gtfsrt"
-	}
-	fmt.Println(fmt.Sprintf("Feed will be written to '%s'.", outputPath))
-	fmt.Println("Ready.")
-	for {
-		run(outputPath)
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func run(outputPath string) {
-	fmt.Println("Updating GTFS Realtime feed.")
-	err := updateTrainsAtAllStations()
-	if err != nil {
-		fmt.Println("There was an error while retrieving the data; update will continue with some data stale.")
-	}
-	feedMessage := buildGtfsRealtimeFeedMessage()
-	out, err := proto.Marshal(&feedMessage)
-	if err != nil {
-		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
-		return
-	}
-	err = ioutil.WriteFile(outputPath, out, 0644)
-	if err != nil {
-		fmt.Println("Update failed: there was an error writing the GTFS Realtime file to disk.")
-		return
-	}
-	fmt.Println("Update successful.")
-}
-
-func initializeApiIdMaps() {
-	routesContent, err := getApiContent(apiUrlRoutes)
-	if err != nil {
-		os.Exit(1)
-	}
-	apiRouteIdToRouteId, err = buildApiRouteIdToRouteId(routesContent)
-	if err != nil {
-		os.Exit(2)
-	}
-	stationsContent, err := getApiContent(apiUrlStations)
-	if err != nil {
-		os.Exit(3)
-	}
-	apiStopIdToStopId, err = buildApiStopIdToStopId(stationsContent)
-	if err != nil {
-		os.Exit(4)
-	}
-	for apiStopId := range apiStopIdToStopId {
-		apiStopIdToApiTrains[apiStopId] = []apiTrain{}
-	}
-}
-
-func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
+func buildGtfsRealtimeFeedMessage(data apiData) gtfs.FeedMessage {
 	gtfsVersion := "0.2"
 	incrementality := gtfs.FeedHeader_FULL_DATASET
 	currentTimestamp := uint64(time.Now().Unix())
@@ -197,14 +150,14 @@ func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 		},
 		Entity: []*gtfs.FeedEntity{},
 	}
-	for apiStopId, trains := range apiStopIdToApiTrains {
+	for apiStopId, trains := range data.apiStopIdToApiTrains {
 		for _, train := range trains {
 			tripUuid, err := uuid.NewRandom()
 			if err != nil {
 				continue
 			}
 			tripId := tripUuid.String()
-			tripUpdate, err := convertApiTrainToTripUpdate(train, tripId, apiStopIdToStopId[apiStopId])
+			tripUpdate, err := convertApiTrainToTripUpdate(data, train, tripId, apiStopId)
 			if err != nil {
 				continue
 			}
@@ -218,7 +171,7 @@ func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	return feedMessage
 }
 
-func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) (update gtfs.TripUpdate, err error) {
+func convertApiTrainToTripUpdate(data apiData, train apiTrain, tripId string, apiStationId string) (update gtfs.TripUpdate, err error) {
 	lastUpdated, err := convertApiTimeStringToTimestamp(train.LastUpdated)
 	if err != nil {
 		return
@@ -228,8 +181,9 @@ func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) (
 	if err != nil {
 		return
 	}
-	routeId := apiRouteIdToRouteId[train.Route]
-	directionId := apiDirectionToDirectionId[train.Direction]
+	stopId := data.apiStopIdToStopId[apiStationId]
+	routeId := data.apiRouteIdToRouteId[train.Route]
+	directionId := data.convertApiDirectionToDirectionId(train.Direction)
 	stopTimeUpdate := gtfs.TripUpdate_StopTimeUpdate{
 		StopSequence: nil,
 		StopId:       &stopId,
@@ -257,4 +211,60 @@ func convertApiTimeStringToTimestamp(timeString string) (t int64, err error) {
 	}
 	t = timeObj.Unix()
 	return
+}
+
+func buildApiStopIdToStopId(stationApiContent []byte) (apiStopIdToStopId map[string]string, err error) {
+	type apiStation struct {
+		ApiId string `json:"station"`
+		Id    string
+	}
+	type apiStationsResponse struct {
+		Stations []apiStation `json:"stations"`
+	}
+	response := apiStationsResponse{}
+	err = json.Unmarshal(stationApiContent, &response)
+	if err != nil {
+		return
+	}
+	apiStopIdToStopId = map[string]string{}
+	for _, station := range response.Stations {
+		apiStopIdToStopId[strings.ToLower(station.ApiId)] = station.Id
+	}
+	return
+}
+
+func main() {
+	fmt.Println("Starting up.")
+	data := apiData{}
+	data.initialize()
+	outputPath, envVarSet := os.LookupEnv("PATH_GTFS_REALTIME_OUTPUT_PATH")
+	if !envVarSet {
+		outputPath = "path.gtfsrt"
+	}
+	fmt.Println(fmt.Sprintf("Feed will be written to '%s'.", outputPath))
+	fmt.Println("Ready.")
+	for {
+		run(data, outputPath)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func run(data apiData, outputPath string) {
+	fmt.Println("Updating GTFS Realtime feed.")
+	err := data.update()
+	if err != nil {
+		fmt.Println("There was an error while retrieving the data; update will continue with some data stale.")
+	}
+	feedMessage := buildGtfsRealtimeFeedMessage(data)
+	out, err := proto.Marshal(&feedMessage)
+	if err != nil {
+		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
+		return
+	}
+	err = ioutil.WriteFile(outputPath, out, 0644)
+	if err != nil {
+		fmt.Println("Update failed: there was an error writing the GTFS Realtime file to disk.")
+		return
+	}
+	fmt.Println("Update successful.")
 }
