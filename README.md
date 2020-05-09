@@ -29,6 +29,18 @@ Some important notes:
 
 Env var `GTFS_REALTIME_OUTPUT_PATH`
 
+### Docker
+
+```
+version: '3.5'
+
+services:
+  path-train-gtfs-realtime:
+    image: jamespfennell/path-train-gtfs-realtime:latest
+    volumes:
+      - ./output:/output
+    restart: always
+```
 ## Exit codes
 
 - 101, could not download routes data

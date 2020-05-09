@@ -38,7 +38,7 @@ type apiData struct {
 	apiStopIdToApiTrains map[string][]apiTrain
 }
 
-func (data apiData) initialize() {
+func (data *apiData) initialize() {
 	routesContent, err := getApiContent(apiUrlRoutes)
 	if err != nil {
 		os.Exit(101)
@@ -62,12 +62,12 @@ func (data apiData) initialize() {
 }
 
 func (data apiData) update() (err error) {
-	updateResults := make(chan apiTrainsAtStation, len(data.apiStopIdToApiTrains))
+	updateResults := make(chan apiTrainsAtStation, len(data.apiStopIdToStopId))
 	for apiStopId := range data.apiStopIdToStopId {
 		apiStopId := apiStopId
 		go func() { updateResults <- getTrainsAtStation(apiStopId) }()
 	}
-	for range data.apiStopIdToApiTrains {
+	for range data.apiStopIdToStopId {
 		updateResult := <-updateResults
 		if updateResult.Err == nil {
 			data.apiStopIdToApiTrains[updateResult.ApiStationId] = updateResult.ApiTrains
