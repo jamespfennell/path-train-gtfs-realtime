@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -17,6 +18,12 @@ type apiTrain struct {
 	LastUpdated      string
 	Route            string
 	Direction        string
+}
+
+type apiTrainsAtStation struct {
+	ApiTrains    []apiTrain
+	ApiStationId string
+	Err          error
 }
 
 var apiStopIdToStopId = map[string]string{}
@@ -33,27 +40,39 @@ var apiDirectionToDirectionId = map[string]uint32{
 	"TO_NJ": uint32(1),
 }
 
-func updateTrainsAtStation(station string) (err error) {
+func getTrainsAtStation(apiStationId string) (result apiTrainsAtStation) {
+	result = apiTrainsAtStation{ApiStationId: apiStationId}
 	type apiRealtimeResponse struct {
 		Trains []apiTrain `json:"upcomingTrains"`
 	}
-	realtimeApiContent, err := getApiContent(fmt.Sprintf(apiUrlRealtime, station))
+	realtimeApiContent, err := getApiContent(fmt.Sprintf(apiUrlRealtime, apiStationId))
 	if err != nil {
+		result.Err = err
 		return
 	}
 	response := apiRealtimeResponse{}
 	err = json.Unmarshal(realtimeApiContent, &response)
 	if err != nil {
+		result.Err = err
 		return
 	}
-	apiStopIdToApiTrains[station] = response.Trains
+	result.ApiTrains = response.Trains
 	return
 }
 
 func updateTrainsAtAllStations() (err error) {
-	// TODO: async?
+	updateResults := make(chan apiTrainsAtStation, len(apiStopIdToApiTrains))
 	for apiStopId := range apiStopIdToStopId {
-		err = updateTrainsAtStation(apiStopId)
+		apiStopId := apiStopId
+		go func() { updateResults <- getTrainsAtStation(apiStopId) }()
+	}
+	for range apiStopIdToApiTrains {
+		updateResult := <-updateResults
+		if updateResult.Err == nil {
+			apiStopIdToApiTrains[updateResult.ApiStationId] = updateResult.ApiTrains
+		} else {
+			err = updateResult.Err
+		}
 	}
 	return
 }
@@ -169,7 +188,7 @@ func initializeApiIdMaps() {
 func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	gtfsVersion := "0.2"
 	incrementality := gtfs.FeedHeader_FULL_DATASET
-	currentTimestamp := uint64(405) // TODO: implement
+	currentTimestamp := uint64(time.Now().Unix())
 	feedMessage := gtfs.FeedMessage{
 		Header: &gtfs.FeedHeader{
 			GtfsRealtimeVersion: &gtfsVersion,
@@ -180,8 +199,15 @@ func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	}
 	for apiStopId, trains := range apiStopIdToApiTrains {
 		for _, train := range trains {
-			tripId := "trip_id" // TODO: should be random
-			tripUpdate := convertApiTrainToTripUpdate(train, tripId, apiStopIdToStopId[apiStopId])
+			tripUuid, err := uuid.NewRandom()
+			if err != nil {
+				continue
+			}
+			tripId := tripUuid.String()
+			tripUpdate, err := convertApiTrainToTripUpdate(train, tripId, apiStopIdToStopId[apiStopId])
+			if err != nil {
+				continue
+			}
 			feedEntity := gtfs.FeedEntity{
 				Id:         &tripId,
 				TripUpdate: &tripUpdate,
@@ -192,9 +218,16 @@ func buildGtfsRealtimeFeedMessage() gtfs.FeedMessage {
 	return feedMessage
 }
 
-func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) gtfs.TripUpdate {
-	lastUpdated := uint64(convertApiTimeStringToTimestamp(train.LastUpdated))
-	arrivalTime := convertApiTimeStringToTimestamp(train.ProjectedArrival)
+func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) (update gtfs.TripUpdate, err error) {
+	lastUpdated, err := convertApiTimeStringToTimestamp(train.LastUpdated)
+	if err != nil {
+		return
+	}
+	lastUpdatedUnsigned := uint64(lastUpdated)
+	arrivalTime, err := convertApiTimeStringToTimestamp(train.ProjectedArrival)
+	if err != nil {
+		return
+	}
 	routeId := apiRouteIdToRouteId[train.Route]
 	directionId := apiDirectionToDirectionId[train.Direction]
 	stopTimeUpdate := gtfs.TripUpdate_StopTimeUpdate{
@@ -213,11 +246,15 @@ func convertApiTrainToTripUpdate(train apiTrain, tripId string, stopId string) g
 		StopTimeUpdate: []*gtfs.TripUpdate_StopTimeUpdate{
 			&stopTimeUpdate,
 		},
-		Timestamp: &lastUpdated,
-	}
+		Timestamp: &lastUpdatedUnsigned,
+	}, nil
 }
 
-// TODO: implement
-func convertApiTimeStringToTimestamp(timeString string) int64 {
-	return int64(4)
+func convertApiTimeStringToTimestamp(timeString string) (t int64, err error) {
+	timeObj, err := time.Parse(time.RFC3339, timeString)
+	if err != nil {
+		return
+	}
+	t = timeObj.Unix()
+	return
 }

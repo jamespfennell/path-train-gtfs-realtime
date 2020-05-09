@@ -6,6 +6,7 @@ FROM golang
 ADD path-train-gtfs-realtime.go /go/src/github.com/jamespfennell/path-train-gtfs-realtime/
 
 # Get dependencies
+RUN go get github.com/google/uuid
 RUN go get github.com/golang/protobuf/proto
 RUN go get github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs
 
