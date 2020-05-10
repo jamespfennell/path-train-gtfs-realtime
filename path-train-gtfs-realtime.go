@@ -291,7 +291,7 @@ func getPeriodicity() int {
 		return 5000
 	}
 	periodicity, err := strconv.Atoi(periodicityString)
-	if err != nil {
+	if err != nil || periodicity < 1000 {
 		fmt.Println(fmt.Sprintf("Expected periodicity in milliseconds to be a number; recieved '%s'; exiting.", periodicityString))
 		os.Exit(exitCodeMalformedEnvVar)
 	}
