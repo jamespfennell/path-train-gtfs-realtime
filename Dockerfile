@@ -12,7 +12,7 @@ RUN go get github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs
 RUN go install github.com/jamespfennell/path-train-gtfs-realtime
 
 RUN mkdir /output
-ENV PATH_GTFS_REALTIME_OUTPUT_PATH=/output/gtfsrt
+ENV PATH_GTFS_RT_OUTPUT_PATH=/output/gtfsrt
 
 # Run the command by default when the container starts.
 ENTRYPOINT /go/bin/path-train-gtfs-realtime
