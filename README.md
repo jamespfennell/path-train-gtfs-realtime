@@ -81,6 +81,17 @@ go get github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs
 After that, just run `go run path-train-gtfs-realtime.go`.
 
 
+```
+needed?
+ go get github.com/golang/protobuf/protoc-gen-go
+go get google.golang.org/grpc   
+
+go get -u github.com/golang/protobuf/protoc-gen-go
+https://grpc.io/docs/tutorials/basic/go/
+https://blog.lelonek.me/a-brief-introduction-to-grpc-in-go-e66e596fe244
+# After cloning the repo
+protoc --go_out=plugins=grpc:. *.proto
+```
 ### Error handling and exit codes
 
 A number of errors can prevent the application from running 100% correctly,

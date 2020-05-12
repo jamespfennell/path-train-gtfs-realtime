@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+import "common.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/type/latlng.proto";
+
+package path_api.v1;
+
+// Service that provides information about PATH stations.
+service Stations {
+    // Lists the metadata for all available stations.
+    rpc ListStations(ListStationsRequest) returns (ListStationsResponse) {
+        option (google.api.http) = {
+            get: "/v1/stations"
+        };
+    }
+
+    // Gets the metadata for a specific station.
+    rpc GetStation(GetStationRequest) returns (StationData) {
+        option (google.api.http) = {
+            get: "/v1/stations/{station}"
+        };
+    }
+
+    // Gets the posted train schedule for a station.
+    rpc GetStationSchedule(GetStationScheduleRequest) returns (GetStationScheduleResponse) {
+        option (google.api.http) = {
+            get: "/v1/stations/{station}/schedule"
+        };
+    }
+
+    // Gets the expected upcoming trains for the station using realtime data.
+    rpc GetUpcomingTrains(GetUpcomingTrainsRequest) returns (GetUpcomingTrainsResponse) {
+        option (google.api.http) = {
+            get: "/v1/stations/{station}/realtime"
+        };
+    }
+}
+
+// The request message for the list stations RPC.
+message ListStationsRequest {
+    // Optional. The maximum number of elements to return for a single request.
+    // If unspecified, the server will pick a reasonable default.
+    int32 page_size = 1;
+
+    // Optional. The page token returned by the server in a previous call. Used
+    // to get the next page.
+    string page_token = 2;
+}
+
+// The response message for the list stations RPC.
+message ListStationsResponse {
+    // This page of stations.
+    repeated StationData stations = 1;
+
+    // The page token used to request the next page. Empty/unspecified if there
+    // are no more results.
+    string next_page_token = 2;
+}
+
+// The request message for the get stations RPC
+message GetStationRequest {
+    // The station to get.
+    Station station = 1;
+}
+
+// The request message for the get station schedule RPC.
+message GetStationScheduleRequest {
+    // The station for this request.
+    Station station = 1;
+
+    // Optional. The maximum number of elements to return for a single request.
+    // If unspecified, the server will pick a reasonable default.
+    int32 page_size = 2;
+
+    // Optional. The page token returned by the server in a previous call. Used
+    // to get the next page.
+    string page_token = 3;
+}
+
+// The response message for the get station schedule RPC.
+message GetStationScheduleResponse {
+    // The page token used to request the next page. Empty/unspecified if there
+    // are no more results.
+    string next_page_token = 1;
+}
+
+// The request message for the get upcoming (realtime) trains RPC.
+message GetUpcomingTrainsRequest {
+    // The station for this request.
+    Station station = 1;
+}
+
+// The response message for the get upcoming (realtime) trains RPC.
+message GetUpcomingTrainsResponse {
+    // Represents a single upcoming train into the station.
+    // Next ID: 9
+    message UpcomingTrain {
+        // The headsign for the train in question (e.g. Newark).
+        string line_name = 1 [ deprecated = true ];
+
+        // The headsign for the train in question (e.g. Newark).
+        string headsign = 6;
+
+        // The route this train is on.
+        Route route = 7;
+
+        // The display name for the route and direction.
+        string route_display_name = 8;
+
+        // The direction of the train along the route.
+        Direction direction = 9;
+    
+        // The collection of colors (in HTML HEX format) that represent the train line.
+        // Usually only a single color applies (orange for JSQ/33rd) but sometimes more
+        // than one color applies (33rd via HOB).
+        repeated string line_colors = 2;
+    
+        // The timestamp (UTC) of the projected arrival of this train.
+        google.protobuf.Timestamp projected_arrival = 3;
+
+        // The possible statuses of a train.
+        enum Status {
+            // The status was not specified.
+            STATUS_UNSPECIFIED = 0;
+
+            // The train is running on or close to schedule.
+            ON_TIME = 1;
+
+            // The train is either in the station or arriving soon.
+            ARRIVING_NOW = 2;
+
+            // The train is experiencing a delay.
+            DELAYED = 3;
+        }
+
+        // The status of the train.
+        Status status = 5;
+    
+        // The timestamp (UTC) when this projection was made.
+        google.protobuf.Timestamp last_updated = 4;
+    }
+
+    // The collection of upcoming trains.
+    repeated UpcomingTrain upcoming_trains = 1;
+}
+
+// Represents a station within the PATH system.
+// Loosely follows GTFS format for "stops" representing location_type of 1.
+// This doesn't directly follow GTFS because the format is both unwieldy for JSON/HTTP
+// APIs and the PATH GTFS data does not populate most fields.
+message StationData {
+    // The PATH station in question.
+    Station station = 1;
+
+    // The ID (stop_id) of this station.
+    string id = 2;
+
+    // The human-friendly name of this station.
+    string name = 3;
+
+    // The geographic coordinates (lat/lon) of this station.
+    google.type.LatLng coordinates = 4;
+
+    // Represents a platform/track/entrence area within a station.
+    // Representing GTFS stops with location_type of 0 and a parent_station.
+    message Area {
+        // The ID (stop_id) of this platform.
+        string id = 1;
+
+        // The human-friendly name of this platform.
+        string name = 2;
+
+        // The grographic coordinates (lat/lon) of this station.
+        google.type.LatLng coordinates = 3;
+    }
+
+    // Collection of platforms/tracks within the station.
+    repeated Area platforms = 6;
+
+    // Collection of entrances to the station.
+    repeated Area entrances = 7;
+
+    // The timezone in which this station is located.
+    string timezone = 8;
+}
