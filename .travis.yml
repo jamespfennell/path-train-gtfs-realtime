@@ -1,6 +1,6 @@
 language: golang
 
-# The Travis CI Job doesn't run any tests, it just builds the Docker image to put on Docker Hub.addons:
+# The Travis CI Job doesn't run any tests, it just builds the Docker image to put on Docker Hub.
 # So, only run the job on master.
 branches:
   only:
