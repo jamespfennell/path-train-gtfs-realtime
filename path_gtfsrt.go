@@ -212,8 +212,6 @@ func (client *httpApiClient) GetRouteToRouteId() (routeToRouteId map[s.Route]str
 func (client *httpApiClient) Close() error { return nil }
 
 func (client *httpApiClient) convertDirectionAsStringToDirection(directionAsString string) s.Direction {
-	// TODO? what in the can't understand case?
-	// TODO: add a test!
 	return s.Direction(s.Direction_value[directionAsString])
 }
 
