@@ -1,5 +1,4 @@
 language: golang
-go_import_path: github.com/jamespfennell/path-train-gtfs-realtime
 
 install:
   - go get github.com/google/uuid

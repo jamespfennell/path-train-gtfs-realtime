@@ -55,8 +55,10 @@ There are a couple of environment variable configurations:
 
 ### Running using Docker
 
-The Travis CI job builds a Docker image and stores it
-in the `jamespfennell/path-train-gtfs-realtime` repository on Docker Hub.
+The [Travis CI job](https://travis-ci.org/github/jamespfennell/path-train-gtfs-realtime)
+builds a Docker image and stores it
+in the `jamespfennell/path-train-gtfs-realtime` 
+[repository on Docker Hub](https://hub.docker.com/repository/docker/jamespfennell/path-train-gtfs-realtime).
 There are both `latest` tags and `build<n>` tags, where `<n>` is the Travis build number.
 You can also build the Docker image locally by running `docker build .` in the
 root of the repo.

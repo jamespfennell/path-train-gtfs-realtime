@@ -22,7 +22,7 @@ build-protos:
 	protoc --go_out=plugins=grpc:./sourceapi  --proto_path=./sourceapi ./sourceapi/*.proto
 
 docker-hub:
-	docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
-	docker tag jamespfennell/path-train-gtfs-realtime:latest jamespfennell/path-train-gtfs-realtime:build$TRAVIS_BUILD_NUMBER
+	docker login --username ${DOCKER_USERNAME} --password ${DOCKER_PASSWORD}
+	docker tag jamespfennell/path-train-gtfs-realtime:latest jamespfennell/path-train-gtfs-realtime:build${TRAVIS_BUILD_NUMBER}
 	docker push jamespfennell/path-train-gtfs-realtime:latest
-	docker push jamespfennell/path-train-gtfs-realtime:build$TRAVIS_BUILD_NUMBER
+	docker push jamespfennell/path-train-gtfs-realtime:build${TRAVIS_BUILD_NUMBER}
