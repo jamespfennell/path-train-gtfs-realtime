@@ -1,18 +1,43 @@
-FROM golang
+# The first step is to retrieve the proto files for the GTFS Realtime spec and the
+# source gRPC API. The protoc Docker image used to build these is based on Alpine
+# Linux and doesn't have the necessary facilities (git, make) to get the protos.
+# This is why we do it in a separate stage.
+FROM buildpack-deps:buster AS get-protos
 
-# Copy the local package files to the container's workspace.
-ADD path-train-gtfs-realtime.go /go/src/github.com/jamespfennell/path-train-gtfs-realtime/
+WORKDIR /build
+ADD Makefile .
+RUN make get-protos
 
-# Dependencies
+FROM namely/grpc-cli as build-protos
+
+COPY --from=get-protos /build /build
+WORKDIR /build
+RUN protoc --go_out=./gtfsrt  --proto_path=./gtfsrt ./gtfsrt/*.proto
+RUN protoc --go_out=plugins=grpc:./sourceapi  --proto_path=/opt/include --proto_path=./sourceapi ./sourceapi/*.proto
+
+FROM golang AS build-go
+
+# Dependencies. These come first to take advantage of Docker caching.
 RUN go get github.com/google/uuid
 RUN go get github.com/golang/protobuf/proto
-RUN go get github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs
+RUN go get google.golang.org/grpc
 
-# Compile
-RUN go install github.com/jamespfennell/path-train-gtfs-realtime
+# We're intentionally only copying over the files that are also kept in source control
+# so that the Docker build replicates the bare metal build.
+COPY --from=build-protos /build/gtfsrt/* /build/gtfsrt/
+COPY --from=build-protos /build/sourceapi/* /build/sourceapi/
+
+WORKDIR /build
+ADD path_gtfsrt.go .
+RUN go build path_gtfsrt.go
+
+# As is standard, we copy over the built binary to its own Docker image so the
+# resulting image does not have redundant Go build infrastructure and artifacts.
+FROM debian:buster
+
+COPY --from=build-go /build/path_gtfsrt /usr/local/bin/
 
 RUN mkdir /output
 ENV PATH_GTFS_RT_OUTPUT_PATH=/output/gtfsrt
 
-# Run the command by default when the container starts.
-ENTRYPOINT /go/bin/path-train-gtfs-realtime
+ENTRYPOINT ["path_gtfsrt"]

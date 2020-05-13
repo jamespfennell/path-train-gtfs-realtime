@@ -1,16 +1,15 @@
 language: golang
+go_import_path: github.com/jamespfennell/path-train-gtfs-realtime
 
-# The Travis CI Job doesn't run any tests, it just builds the Docker image to put on Docker Hub.
-# So, only run the job on master.
-branches:
-  only:
-    - master
-
-script:
+install:
+  - go get github.com/google/uuid
+  - go get github.com/golang/protobuf/proto
+  - go get google.golang.org/grpc
+  - go build path_gtfsrt.go
   - docker build . -t jamespfennell/path-train-gtfs-realtime:latest
 
-after_success:
-  - docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
-  - docker tag jamespfennell/path-train-gtfs-realtime:latest jamespfennell/path-train-gtfs-realtime:build$TRAVIS_BUILD_NUMBER
-  - docker push jamespfennell/path-train-gtfs-realtime:latest
-  - docker push jamespfennell/path-train-gtfs-realtime:build$TRAVIS_BUILD_NUMBER
+deploy:
+  - provider: script
+    script: make docker-hub
+    on:
+      branch: master

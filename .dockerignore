@@ -1,2 +1,3 @@
 *
-!path-train-gtfs-realtime.go
+!path_gtfsrt.go
+!Makefile

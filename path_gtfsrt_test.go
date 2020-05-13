@@ -1,6 +1,6 @@
 package main
 
-import s "./source"
+import s "./sourceapi"
 import "testing"
 
 var flagtests = []struct {

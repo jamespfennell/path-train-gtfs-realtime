@@ -13,11 +13,11 @@
 package main
 
 import (
-	s "./source"
+	gtfs "./gtfsrt"
+	s "./sourceapi"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/uuid"
@@ -31,19 +31,20 @@ import (
 )
 
 const (
-	exitCodeMalformedEnvVar         = 101
-	exitCodeMalformedRoutesResponse = 103
-	exitCodeMalformedStopsResponse  = 105
-	exitCodeCannotWriteToDisk       = 106
-	requestTimeoutMilliseconds      = 3000
-	envVarSourceApi                 = "PATH_GTFS_RT_SOURCE_API"
-	envVarPeriodicity               = "PATH_GTFS_RT_PERIODICITY_MILLISECONDS"
-	envVarOutputPath                = "PATH_GTFS_RT_OUTPUT_PATH"
-	grpcApiUrl                      = "path.grpc.razza.dev:443"
-	apiBaseUrl                      = "https://path.api.razza.dev/v1/"
-	apiRoutesEndpoint               = "routes/"
-	apiStationsEndpoint             = "stations/"
-	apiRealtimeEndpoint             = "stations/%s/realtime/"
+	exitCodeMalformedEnvVarPeriodicity = 101
+	exitCodeMalformedEnvVarApi         = 102
+	exitCodeCannotWriteToDisk          = 103
+	exitCodeCannotGetRoutesData        = 104
+	exitCodeCannotGetStationsData      = 105
+	requestTimeoutMilliseconds         = 3000
+	envVarSourceApi                    = "PATH_GTFS_RT_SOURCE_API"
+	envVarPeriodicity                  = "PATH_GTFS_RT_PERIODICITY_MILLISECONDS"
+	envVarOutputPath                   = "PATH_GTFS_RT_OUTPUT_PATH"
+	grpcApiUrl                         = "path.grpc.razza.dev:443"
+	apiBaseUrl                         = "https://path.api.razza.dev/v1/"
+	apiRoutesEndpoint                  = "routes/"
+	apiStationsEndpoint                = "stations/"
+	apiRealtimeEndpoint                = "stations/%s/realtime/"
 )
 
 // (1)
@@ -64,12 +65,12 @@ func (data *apiData) initialize() {
 	data.routeToRouteId, err = (*data.client).GetRouteToRouteId()
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(exitCodeMalformedRoutesResponse)
+		os.Exit(exitCodeCannotGetRoutesData)
 	}
 	data.stationToStopId, err = (*data.client).GetStationToStopId()
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(exitCodeMalformedStopsResponse)
+		os.Exit(exitCodeCannotGetStationsData)
 	}
 	data.stationIdToUpcomingTrains = map[s.Station][]*s.GetUpcomingTrainsResponse_UpcomingTrain{}
 	for apiStationId := range data.stationToStopId {
@@ -311,7 +312,7 @@ func (client *grpcApiClient) createContext() context.Context {
 // (3)
 
 // Build a GTFS Realtime message from a snapshot of the current data.
-func buildGtfsRealtimeFeedMessage(data apiData) gtfs.FeedMessage {
+func buildGtfsRealtimeFeedMessage(data *apiData) *gtfs.FeedMessage {
 	gtfsVersion := "0.2"
 	incrementality := gtfs.FeedHeader_FULL_DATASET
 	currentTimestamp := uint64(time.Now().Unix())
@@ -326,25 +327,25 @@ func buildGtfsRealtimeFeedMessage(data apiData) gtfs.FeedMessage {
 	for apiStationId, trains := range data.stationIdToUpcomingTrains {
 		for _, train := range trains {
 			tripId := newPseudoTripId()
-			tripUpdate, err := convertApiTrainToTripUpdate(&data, train, tripId, apiStationId)
+			tripUpdate, err := convertApiTrainToTripUpdate(data, train, tripId, apiStationId)
 			if err != nil {
 				continue
 			}
 			feedEntity := gtfs.FeedEntity{
 				Id:         &tripId,
-				TripUpdate: &tripUpdate,
+				TripUpdate: tripUpdate,
 			}
 			feedMessage.Entity = append(feedMessage.Entity, &feedEntity)
 		}
 	}
-	return feedMessage
+	return &feedMessage
 }
 
 func convertApiTrainToTripUpdate(
 	data *apiData,
 	train *s.GetUpcomingTrainsResponse_UpcomingTrain,
 	tripId string,
-	station s.Station) (update gtfs.TripUpdate, err error) {
+	station s.Station) (update *gtfs.TripUpdate, err error) {
 	lastUpdatedUnsigned := uint64(train.LastUpdated.Seconds)
 	arrivalTime := train.ProjectedArrival.Seconds
 	stopId := data.stationToStopId[station]
@@ -357,7 +358,7 @@ func convertApiTrainToTripUpdate(
 			Time: &arrivalTime,
 		},
 	}
-	return gtfs.TripUpdate{
+	return &gtfs.TripUpdate{
 		Trip: &gtfs.TripDescriptor{
 			TripId:      &tripId,
 			RouteId:     &routeId,
@@ -390,7 +391,7 @@ func getPeriodicity() int {
 	periodicity, err := strconv.Atoi(periodicityString)
 	if err != nil || periodicity < 1000 {
 		fmt.Println(fmt.Sprintf("Expected periodicity in milliseconds to be a number; recieved '%s'; exiting.", periodicityString))
-		os.Exit(exitCodeMalformedEnvVar)
+		os.Exit(exitCodeMalformedEnvVarPeriodicity)
 	}
 	return periodicity
 }
@@ -406,7 +407,7 @@ func getSourceApi() string {
 	if strings.ToLower(sourceString) == "http" {
 		return "grpc"
 	}
-	os.Exit(exitCodeMalformedEnvVar)
+	os.Exit(exitCodeMalformedEnvVarApi)
 	return ""
 }
 
@@ -419,14 +420,14 @@ func ensureCanWrite(outputPath string) {
 }
 
 // Run one feed update iteration.
-func run(data apiData, outputPath string) {
+func run(data *apiData, outputPath string) {
 	fmt.Println("Updating GTFS Realtime feed.")
 	err := data.update()
 	if err != nil {
 		fmt.Println("There was an error while retrieving the data; update will continue with some data stale.")
 	}
 	feedMessage := buildGtfsRealtimeFeedMessage(data)
-	out, err := proto.Marshal(&feedMessage)
+	out, err := proto.Marshal(feedMessage)
 	if err != nil {
 		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
 		return
@@ -471,7 +472,7 @@ func main() {
 
 	data.initialize()
 	for {
-		run(data, outputPath)
+		run(&data, outputPath)
 		time.Sleep(time.Duration(periodicity) * time.Millisecond)
 	}
 }
