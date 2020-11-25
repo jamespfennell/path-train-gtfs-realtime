@@ -15,21 +15,22 @@ WORKDIR /build
 RUN protoc --go_out=./gtfsrt  --proto_path=./gtfsrt ./gtfsrt/*.proto
 RUN protoc --go_out=plugins=grpc:./sourceapi  --proto_path=/opt/include --proto_path=./sourceapi ./sourceapi/*.proto
 
-FROM golang AS build-go
+FROM golang:1.14 AS build-go
 
 # Dependencies. These come first to take advantage of Docker caching.
-RUN go get github.com/google/uuid
-RUN go get github.com/golang/protobuf/proto
-RUN go get google.golang.org/grpc
+ENV GO111MODULE=on
+WORKDIR /build
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 
 # We're intentionally only copying over the files that are also kept in source control
 # so that the Docker build replicates the bare metal build.
 COPY --from=build-protos /build/gtfsrt/* /build/gtfsrt/
 COPY --from=build-protos /build/sourceapi/* /build/sourceapi/
 
-WORKDIR /build
-ADD path_gtfsrt.go .
-RUN go build path_gtfsrt.go
+COPY . .
+RUN go build cmd/path_gtfsrt.go
 
 # As is standard, we copy over the built binary to its own Docker image so the
 # resulting image does not have redundant Go build infrastructure and artifacts.

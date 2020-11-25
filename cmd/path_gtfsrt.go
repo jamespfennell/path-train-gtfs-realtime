@@ -13,14 +13,14 @@
 package main
 
 import (
-	gtfs "./gtfsrt"
-	s "./sourceapi"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/uuid"
+	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/gtfsrt"
+	s "github.com/jamespfennell/path-train-gtfs-realtime/sourceapi"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
