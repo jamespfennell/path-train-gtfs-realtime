@@ -20,7 +20,7 @@ jobs:
           go mod download
 
       - name: Build the binary
-        run: go build cmd/path_gtfsrt.go
+        run: go build cmd/pathgtfsrt.go
 
   docker-build-and-push:
     runs-on: ubuntu-latest

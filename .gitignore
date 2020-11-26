@@ -1,6 +1,6 @@
 path.gtfsrt
 path-train-gtfs-realtime
-sourceapi/google
+feed/sourceapi/google
 git
 path_gtfsrt
 

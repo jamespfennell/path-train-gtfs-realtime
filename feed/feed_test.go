@@ -1,6 +1,6 @@
-package main
+package feed
 
-import s "./sourceapi"
+import s "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
 import "testing"
 
 var flagtests = []struct {

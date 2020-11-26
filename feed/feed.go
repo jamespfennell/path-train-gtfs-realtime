@@ -10,7 +10,7 @@
 // (3) Functions for converting the data structures in (1) to GTFS Realtime protobuf data structures.
 // (4) Code that launches the application and uses (1), (2) and (3) to create the feed.
 
-package main
+package feed
 
 import (
 	"context"
@@ -19,32 +19,26 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/uuid"
-	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/gtfsrt"
-	s "github.com/jamespfennell/path-train-gtfs-realtime/sourceapi"
+	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/feed/gtfsrt"
+	s "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	exitCodeMalformedEnvVarPeriodicity = 101
-	exitCodeMalformedEnvVarApi         = 102
-	exitCodeCannotWriteToDisk          = 103
-	exitCodeCannotGetRoutesData        = 104
-	exitCodeCannotGetStationsData      = 105
-	requestTimeoutMilliseconds         = 3000
-	envVarSourceApi                    = "PATH_GTFS_RT_SOURCE_API"
-	envVarPeriodicity                  = "PATH_GTFS_RT_PERIODICITY_MILLISECONDS"
-	envVarOutputPath                   = "PATH_GTFS_RT_OUTPUT_PATH"
-	grpcApiUrl                         = "path.grpc.razza.dev:443"
-	apiBaseUrl                         = "https://path.api.razza.dev/v1/"
-	apiRoutesEndpoint                  = "routes/"
-	apiStationsEndpoint                = "stations/"
-	apiRealtimeEndpoint                = "stations/%s/realtime/"
+	exitCodeCannotGetRoutesData   = 104
+	exitCodeCannotGetStationsData = 105
+	requestTimeoutMilliseconds    = 3000
+	grpcApiUrl                    = "path.grpc.razza.dev:443"
+	apiBaseUrl                    = "https://path.api.razza.dev/v1/"
+	apiRoutesEndpoint             = "routes/"
+	apiStationsEndpoint           = "stations/"
+	apiRealtimeEndpoint           = "stations/%s/realtime/"
 )
 
 // (1)
@@ -87,7 +81,9 @@ func (data *apiData) update() (err error) {
 	allTrainsAtStations := make(chan trainsAtStation, len(data.stationToStopId))
 	for station := range data.stationToStopId {
 		station := station
-		go func() { allTrainsAtStations <- (*data.client).GetTrainsAtStation(station) }()
+		go func() {
+			allTrainsAtStations <- (*data.client).GetTrainsAtStation(station)
+		}()
 	}
 	for range data.stationToStopId {
 		trainsAtStation := <-allTrainsAtStations
@@ -297,6 +293,7 @@ func (client *grpcApiClient) GetTrainsAtStation(station s.Station) (result train
 	result = trainsAtStation{Station: station, Trains: []*s.GetUpcomingTrainsResponse_UpcomingTrain{}}
 	response, err := (*client.stations).GetUpcomingTrains(client.createContext(), &request)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	result.Trains = response.UpcomingTrains
@@ -382,45 +379,8 @@ func newPseudoTripId() string {
 
 // (4)
 
-// Determine the desired periodicity of the update from an env var.
-func getPeriodicity() int {
-	periodicityString, envVarSet := os.LookupEnv(envVarPeriodicity)
-	if !envVarSet {
-		return 5000
-	}
-	periodicity, err := strconv.Atoi(periodicityString)
-	if err != nil || periodicity < 1000 {
-		fmt.Println(fmt.Sprintf("Expected periodicity in milliseconds to be a number; recieved '%s'; exiting.", periodicityString))
-		os.Exit(exitCodeMalformedEnvVarPeriodicity)
-	}
-	return periodicity
-}
-
-func getSourceApi() string {
-	sourceString, envVarSet := os.LookupEnv(envVarSourceApi)
-	if !envVarSet {
-		return "grpc"
-	}
-	if strings.ToLower(sourceString) == "grpc" {
-		return "grpc"
-	}
-	if strings.ToLower(sourceString) == "http" {
-		return "grpc"
-	}
-	os.Exit(exitCodeMalformedEnvVarApi)
-	return ""
-}
-
-func ensureCanWrite(outputPath string) {
-	err := ioutil.WriteFile(outputPath, []byte{}, 0644)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Unable to write to '%s', exiting.", outputPath))
-		os.Exit(exitCodeCannotWriteToDisk)
-	}
-}
-
 // Run one feed update iteration.
-func run(data *apiData, outputPath string) {
+func (b *Feed) run(data *apiData) {
 	fmt.Println("Updating GTFS Realtime feed.")
 	err := data.update()
 	if err != nil {
@@ -432,47 +392,57 @@ func run(data *apiData, outputPath string) {
 		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
 		return
 	}
-	err = ioutil.WriteFile(outputPath, out, 0644)
-	if err != nil {
-		fmt.Println("Update failed: there was an error writing the GTFS Realtime file to disk.")
-		return
-	}
-	fmt.Println("Update successful.")
+	b.m.Lock()
+	defer b.m.Unlock()
+	b.feed = out
+	fmt.Println("Done")
 }
 
-func main() {
+type Feed struct {
+	feed         []byte
+	m            sync.RWMutex
+	updatePeriod time.Duration
+	data         *apiData // TODO: remove
+}
+
+func (b *Feed) runInBackground() {
+	defer func() {
+		err := (*b.data.client).Close()
+		if err != nil {
+			fmt.Println("Error while closing client connection:", err.Error())
+		}
+	}()
+	b.data.initialize()
+	for {
+		b.run(b.data)
+		time.Sleep(b.updatePeriod)
+	}
+}
+
+func NewFeed(updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) *Feed {
 	fmt.Println("Starting up")
 
 	var client apiClient
-	if getSourceApi() == "grpc" {
+	if !useHTTPSourceAPI {
 		fmt.Println("Source API: gRPC")
 		client = newGrpcApiClient()
 	} else {
 		fmt.Println("Source API: HTTP")
 		client = &httpApiClient{}
 	}
-	defer func() {
-		err := client.Close()
-		if err != nil {
-			fmt.Println("Error while closing client connection:", err.Error())
-		}
-	}()
-	data := apiData{client: &client}
-
-	outputPath, envVarSet := os.LookupEnv(envVarOutputPath)
-	if !envVarSet {
-		outputPath = "path.gtfsrt"
+	b := Feed{
+		updatePeriod: updatePeriod,
+		data:         &apiData{client: &client},
 	}
-	ensureCanWrite(outputPath)
-	fmt.Println(fmt.Sprintf("Output path: %s", outputPath))
 
-	periodicity := getPeriodicity()
-	fmt.Println(fmt.Sprintf("Update periodcity: %d", periodicity))
-	fmt.Println("Ready")
+	go b.runInBackground()
+	return &b
+}
 
-	data.initialize()
-	for {
-		run(&data, outputPath)
-		time.Sleep(time.Duration(periodicity) * time.Millisecond)
-	}
+func (b *Feed) Get() []byte {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	r := make([]byte, len(b.feed))
+	copy(r, b.feed)
+	return r
 }

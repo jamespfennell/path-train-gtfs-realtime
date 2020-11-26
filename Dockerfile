@@ -30,15 +30,15 @@ COPY --from=build-protos /build/gtfsrt/* /build/gtfsrt/
 COPY --from=build-protos /build/sourceapi/* /build/sourceapi/
 
 COPY . .
-RUN go build cmd/path_gtfsrt.go
+RUN go build cmd/pathgtfsrt.go
 
 # As is standard, we copy over the built binary to its own Docker image so the
 # resulting image does not have redundant Go build infrastructure and artifacts.
 FROM debian:buster
 
-COPY --from=build-go /build/path_gtfsrt /usr/local/bin/
+COPY --from=build-go /build/pathgtfsrt /usr/local/bin/
 
 RUN mkdir /output
 ENV PATH_GTFS_RT_OUTPUT_PATH=/output/gtfsrt
 
-ENTRYPOINT ["path_gtfsrt"]
+ENTRYPOINT ["pathgtfsrt"]
