@@ -14,7 +14,7 @@ var flagtests = []struct {
 }
 
 func TestConvertDirectionAsStringToDirection(t *testing.T) {
-	client := httpApiClient{}
+	client := httpClient{}
 
 	for _, testCase := range flagtests {
 		actual := client.convertDirectionAsStringToDirection(testCase.in)
