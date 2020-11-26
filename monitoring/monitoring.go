@@ -1,6 +1,10 @@
 package monitoring
 
-import "time"
+import (
+	"fmt"
+	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
+	"time"
+)
 
 type Monitor struct{}
 
@@ -21,7 +25,12 @@ type Updates struct {
 	BuilderErr  error
 }
 
-func (m *Monitor) RecordUpdate(
-	stopIDToErr map[string]error, builderErr error) {
+type StationUpdateResult struct {
+	NumTrips int
+	Err      error
+}
 
+func (m *Monitor) RecordUpdate(
+	stopIDToErr map[sourceapi.Station]StationUpdateResult, builderErr error) {
+	fmt.Println("Received monitoring update", stopIDToErr)
 }

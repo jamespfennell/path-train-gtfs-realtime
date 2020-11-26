@@ -67,14 +67,12 @@ func (s *source) initializeData() error {
 // This method is highly I/O bound: the time it takes to execute is largely spent waiting for HTTP responses
 // from the 14 station endpoints.
 // To speed it up, the 14 endpoints are hit in parallel.
-// TODO: return the errors and number of trains returned
-func (s *source) updateData() (err error) {
+func (s *source) updateData() map[sourceapi.Station]monitoring.StationUpdateResult {
 	type trainsAtStation struct {
 		Station sourceapi.Station
 		Trains  []Train
 		Err     error
 	}
-	// TODO: make this less fragile, perhaps using a wait group
 	allTrainsAtStations := make(chan trainsAtStation, len(s.data.stationToStopId))
 	for station := range s.data.stationToStopId {
 		station := station
@@ -84,15 +82,21 @@ func (s *source) updateData() (err error) {
 			allTrainsAtStations <- r
 		}()
 	}
+	result := map[sourceapi.Station]monitoring.StationUpdateResult{}
 	for range s.data.stationToStopId {
 		trainsAtStation := <-allTrainsAtStations
-		if trainsAtStation.Err == nil {
-			s.data.stationIdToUpcomingTrains[trainsAtStation.Station] = trainsAtStation.Trains
-		} else {
-			err = trainsAtStation.Err
+		result[trainsAtStation.Station] = monitoring.StationUpdateResult{
+			Err:      trainsAtStation.Err,
+			NumTrips: len(trainsAtStation.Trains),
 		}
+		if trainsAtStation.Err != nil {
+			fmt.Println("There was an error when retrieving data for station",
+				s.data.stationToStopId[trainsAtStation.Station])
+			continue
+		}
+		s.data.stationIdToUpcomingTrains[trainsAtStation.Station] = trainsAtStation.Trains
 	}
-	return
+	return result
 }
 
 func convertDirectionToBoolean(direction sourceapi.Direction) *uint32 {
@@ -378,12 +382,10 @@ func newPseudoTripId() string {
 // Run one feed update iteration.
 func (f *Feed) update() {
 	fmt.Println("Updating GTFS Realtime feed.")
-	err := f.source.updateData()
-	if err != nil {
-		fmt.Println("There was an error while retrieving the data; update will continue with some data stale.")
-	}
+	result := f.source.updateData()
 	feedMessage := buildGtfsRealtimeFeedMessage(&f.source.data)
 	out, err := proto.Marshal(feedMessage)
+	f.monitor.RecordUpdate(result, err)
 	if err != nil {
 		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
 		return
