@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -14,9 +15,15 @@ func Run(port int, f *feed.Feed) {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	_, err := fmt.Fprintf(w, "Access the feed at /feed/")
+	tmpl, err := template.New("index.html").Parse(indexHTMLPage)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(w, "data goes here")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
