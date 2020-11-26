@@ -3,12 +3,13 @@ package server
 import (
 	"fmt"
 	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
+	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 	"html/template"
 	"log"
 	"net/http"
 )
 
-func Run(port int, f *feed.Feed) {
+func Run(port int, f *feed.Feed, monitor *monitoring.Monitor) {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/feed/", feedHandlerFactory(f))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/feed/gtfsrt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
+	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
@@ -18,17 +19,19 @@ import (
 )
 
 const (
-	grpcApiUrl                    = "path.grpc.razza.dev:443"
-	apiBaseUrl                    = "https://path.api.razza.dev/v1/"
-	apiRoutesEndpoint             = "routes/"
-	apiStationsEndpoint           = "stations/"
-	apiRealtimeEndpoint           = "stations/%sourceapi/realtime/"
+	grpcApiUrl          = "path.grpc.razza.dev:443"
+	apiBaseUrl          = "https://path.api.razza.dev/v1/"
+	apiRoutesEndpoint   = "routes/"
+	apiStationsEndpoint = "stations/"
+	apiRealtimeEndpoint = "stations/%sourceapi/realtime/"
 )
 
 // (1)
 
+type Train *sourceapi.GetUpcomingTrainsResponse_UpcomingTrain
+
 type source struct {
-	data sourceData
+	data   sourceData
 	client sourceClient
 }
 
@@ -37,7 +40,7 @@ type source struct {
 type sourceData struct {
 	stationToStopId           map[sourceapi.Station]string
 	routeToRouteId            map[sourceapi.Route]string
-	stationIdToUpcomingTrains map[sourceapi.Station][]*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain
+	stationIdToUpcomingTrains map[sourceapi.Station][]Train
 }
 
 // Initialize the sourceData data structure by populating its stop and route fields.
@@ -52,9 +55,9 @@ func (s *source) initializeData() error {
 	if err != nil {
 		return err
 	}
-	s.data.stationIdToUpcomingTrains = map[sourceapi.Station][]*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{}
+	s.data.stationIdToUpcomingTrains = map[sourceapi.Station][]Train{}
 	for apiStationId := range s.data.stationToStopId {
-		s.data.stationIdToUpcomingTrains[apiStationId] = []*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{}
+		s.data.stationIdToUpcomingTrains[apiStationId] = []Train{}
 	}
 	return nil
 }
@@ -64,13 +67,21 @@ func (s *source) initializeData() error {
 // This method is highly I/O bound: the time it takes to execute is largely spent waiting for HTTP responses
 // from the 14 station endpoints.
 // To speed it up, the 14 endpoints are hit in parallel.
+// TODO: return the errors and number of trains returned
 func (s *source) updateData() (err error) {
+	type trainsAtStation struct {
+		Station sourceapi.Station
+		Trains  []Train
+		Err     error
+	}
 	// TODO: make this less fragile, perhaps using a wait group
 	allTrainsAtStations := make(chan trainsAtStation, len(s.data.stationToStopId))
 	for station := range s.data.stationToStopId {
 		station := station
 		go func() {
-			allTrainsAtStations <- s.client.GetTrainsAtStation(station)
+			r := trainsAtStation{Station: station}
+			r.Trains, r.Err = s.client.GetTrainsAtStation(station)
+			allTrainsAtStations <- r
 		}()
 	}
 	for range s.data.stationToStopId {
@@ -84,7 +95,7 @@ func (s *source) updateData() (err error) {
 	return
 }
 
-func (data *sourceData) convertDirectionToBoolean(direction sourceapi.Direction) *uint32 {
+func convertDirectionToBoolean(direction sourceapi.Direction) *uint32 {
 	var result uint32
 	if direction == sourceapi.Direction_TO_NY {
 		result = 1
@@ -96,26 +107,19 @@ func (data *sourceData) convertDirectionToBoolean(direction sourceapi.Direction)
 
 // (2)
 
-type trainsAtStation struct {
-	Station sourceapi.Station
-	Trains  []*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain
-	Err     error
-}
-
 // sourceClient is a way to get data from the Razza API
 type sourceClient interface {
 	GetStationToStopId() (map[sourceapi.Station]string, error)
 	GetRouteToRouteId() (map[sourceapi.Route]string, error)
-	GetTrainsAtStation(sourceapi.Station) trainsAtStation
+	GetTrainsAtStation(sourceapi.Station) ([]Train, error)
 	Close() error
 }
 
-type httpClient struct{
+type httpClient struct {
 	timeoutPeriod time.Duration
 }
 
-func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) (result trainsAtStation) {
-	result = trainsAtStation{Station: station, Trains: []*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{}}
+func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) ([]Train, error) {
 	type jsonUpcomingTrain struct {
 		ProjectedArrival  string
 		LastUpdated       string
@@ -128,15 +132,14 @@ func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) (result 
 	stationAsString := strings.ToLower(sourceapi.Station_name[int32(station)])
 	realtimeApiContent, err := client.getContent(fmt.Sprintf(apiRealtimeEndpoint, stationAsString))
 	if err != nil {
-		result.Err = err
-		return
+		return nil, err
 	}
 	response := jsonGetUpcomingTrainsResponse{}
 	err = json.Unmarshal(realtimeApiContent, &response)
 	if err != nil {
-		result.Err = err
-		return
+		return nil, err
 	}
+	var trains []Train
 	for _, rawUpcomingTrain := range response.Trains {
 		upcomingTrain := sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{
 			Route:            client.convertRouteAsStringToRoute(rawUpcomingTrain.RouteAsString),
@@ -144,16 +147,15 @@ func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) (result 
 			ProjectedArrival: client.convertApiTimeStringToTimestamp(rawUpcomingTrain.ProjectedArrival),
 			LastUpdated:      client.convertApiTimeStringToTimestamp(rawUpcomingTrain.LastUpdated),
 		}
-		result.Trains = append(result.Trains, &upcomingTrain)
+		trains = append(trains, &upcomingTrain)
 	}
-	return
+	return trains, nil
 }
 
-// TODO: remove named return values everywhere
-func (client *httpClient) GetStationToStopId() (stationToStopId map[sourceapi.Station]string, err error) {
+func (client *httpClient) GetStationToStopId() (map[sourceapi.Station]string, error) {
 	stationsContent, err := client.getContent(apiStationsEndpoint)
 	if err != nil {
-		return
+		return nil, err
 	}
 	type jsonStationData struct {
 		StationAsString string `json:"station"`
@@ -165,16 +167,16 @@ func (client *httpClient) GetStationToStopId() (stationToStopId map[sourceapi.St
 	response := jsonListStationsResponse{}
 	err = json.Unmarshal(stationsContent, &response)
 	if err != nil {
-		return
+		return nil, err
 	}
-	stationToStopId = map[sourceapi.Station]string{}
+	stationToStopId := map[sourceapi.Station]string{}
 	for _, stationData := range response.Stations {
 		stationToStopId[client.convertStationAsStringToStation(stationData.StationAsString)] = stationData.Id
 	}
-	return
+	return stationToStopId, nil
 }
 
-func (client *httpClient) GetRouteToRouteId() (routeToRouteId map[sourceapi.Route]string, err error) {
+func (client *httpClient) GetRouteToRouteId() (map[sourceapi.Route]string, error) {
 	routesContent, err := client.getContent(apiRoutesEndpoint)
 	if err != nil {
 		return nil, err
@@ -189,13 +191,13 @@ func (client *httpClient) GetRouteToRouteId() (routeToRouteId map[sourceapi.Rout
 	response := jsonListRoutesResponse{}
 	err = json.Unmarshal(routesContent, &response)
 	if err != nil {
-		return
+		return nil, err
 	}
-	routeToRouteId = map[sourceapi.Route]string{}
+	routeToRouteId := map[sourceapi.Route]string{}
 	for _, routeData := range response.Routes {
 		routeToRouteId[client.convertRouteAsStringToRoute(routeData.RouteAsString)] = routeData.Id
 	}
-	return
+	return routeToRouteId, nil
 }
 
 func (client *httpClient) Close() error { return nil }
@@ -237,9 +239,9 @@ func (client httpClient) getContent(endpoint string) (bytes []byte, err error) {
 }
 
 type grpcClient struct {
-	conn     *grpc.ClientConn
-	stations *sourceapi.StationsClient
-	routes   *sourceapi.RoutesClient
+	conn          *grpc.ClientConn
+	stations      *sourceapi.StationsClient
+	routes        *sourceapi.RoutesClient
 	timeoutPeriod time.Duration
 }
 
@@ -281,16 +283,17 @@ func (client *grpcClient) Close() error {
 	return client.conn.Close()
 }
 
-func (client *grpcClient) GetTrainsAtStation(station sourceapi.Station) (result trainsAtStation) {
+func (client *grpcClient) GetTrainsAtStation(station sourceapi.Station) ([]Train, error) {
 	request := sourceapi.GetUpcomingTrainsRequest{Station: station}
-	result = trainsAtStation{Station: station, Trains: []*sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{}}
 	response, err := (*client.stations).GetUpcomingTrains(client.createContext(), &request)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return nil, err
 	}
-	result.Trains = response.UpcomingTrains
-	return
+	var trains []Train
+	for _, train := range response.UpcomingTrains {
+		trains = append(trains, train)
+	}
+	return trains, nil
 }
 
 func (client *grpcClient) createContext() context.Context {
@@ -352,7 +355,7 @@ func convertApiTrainToTripUpdate(
 		Trip: &gtfs.TripDescriptor{
 			TripId:      &tripId,
 			RouteId:     &routeId,
-			DirectionId: data.convertDirectionToBoolean(train.Direction),
+			DirectionId: convertDirectionToBoolean(train.Direction),
 		},
 		StopTimeUpdate: []*gtfs.TripUpdate_StopTimeUpdate{
 			&stopTimeUpdate,
@@ -391,11 +394,11 @@ func (f *Feed) update() {
 	fmt.Println("Done")
 }
 
-
 type Feed struct {
-	gtfs         []byte
-	mutex        sync.RWMutex
-	source       source
+	gtfs    []byte
+	mutex   sync.RWMutex
+	source  source
+	monitor *monitoring.Monitor
 }
 
 func (f *Feed) runInBackground(initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
@@ -433,9 +436,9 @@ func (f *Feed) runInBackground(initChan chan<- error, updatePeriod, timeoutPerio
 	}
 }
 
-func NewFeed(updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error){
+func NewFeed(monitor *monitoring.Monitor, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
 	initChan := make(chan error)
-	f := Feed{}
+	f := Feed{monitor: monitor}
 	go f.runInBackground(initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
 	return &f, <-initChan
 }
