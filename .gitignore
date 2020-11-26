@@ -2,7 +2,7 @@ path.gtfsrt
 path-train-gtfs-realtime
 feed/sourceapi/google
 git
-path_gtfsrt
+pathgtfsrt
 
 .idea
 # Binaries for programs and plugins
