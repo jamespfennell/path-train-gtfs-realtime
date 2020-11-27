@@ -19,7 +19,7 @@ func main() {
 		"use the HTTP source API instead of the default gRPC API")
 	flag.Parse()
 
-	m := monitoring.NewMonitor()
+	m := monitoring.NewMonitor(100) // TODO: flag configurable
 	f, err := feed.NewFeed(m, *updatePeriod, *timeoutPeriod, *useHTTPSourceAPI)
 	if err != nil {
 		fmt.Println("Failed to initialize feed:", err)

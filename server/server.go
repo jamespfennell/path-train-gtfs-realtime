@@ -12,6 +12,8 @@ import (
 func Run(port int, f *feed.Feed, monitor *monitoring.Monitor) {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/feed/", feedHandlerFactory(f))
+	http.HandleFunc("/status/", htmlHandlerFactory(monitor))
+	http.HandleFunc("/status/json", jsonHandlerFactory(monitor))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
@@ -32,6 +34,24 @@ func feedHandlerFactory(f *feed.Feed) func(w http.ResponseWriter, r *http.Reques
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: set content type
 		_, err := w.Write(f.Get())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func jsonHandlerFactory(m *monitoring.Monitor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := m.WriteJson(w)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func htmlHandlerFactory(m *monitoring.Monitor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := m.WriteHTML(w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

@@ -1,6 +1,7 @@
 package server
 
-const indexHTMLPage = `<!doctype html>
+const indexHTMLPage = `
+<!doctype html>
 
 <html lang="en">
 <head>
