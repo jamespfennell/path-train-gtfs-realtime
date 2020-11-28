@@ -6,7 +6,7 @@ const statusHtmlTemplate = `
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>PATH Train GTFS Realtime feed</title>
+    <title>PATH Train GTFS Realtime | Status page</title>
 
 <style>
 html {
@@ -87,7 +87,11 @@ table tr td.failure {
 
 <body>
 
-	<h1>PATH GTFS Realtime Status Page</h1>
+	<h1>PATH Train GTFS Realtime</h1>
+	<h1>Status Page</h1>
+
+	<h2>Summary</h2>
+	<!-- TODO: time since launch, flag values, average latencies and success times for the last 15 mins -->
 	<h2>History</h2>
 	<table>
   <tr>
