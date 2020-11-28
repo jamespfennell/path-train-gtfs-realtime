@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
 	"html/template"
@@ -9,9 +10,6 @@ import (
 	"sync"
 	"time"
 )
-
-// TODO: create a fixed length cache
-// Create an interface first and then implement
 
 type cache struct {
 	store []Updates
@@ -83,14 +81,17 @@ func (c *cache) Copy() []Updates {
 }
 
 type Monitor struct {
-	c   cache
-	bus chan Updates
+	c                        cache
+	bus                      chan Updates
+	updatePeriod             time.Duration
+	lastSuccessfulUpdateTime *time.Time
 }
 
-func NewMonitor(cacheSize int) *Monitor {
+func NewMonitor(cacheSize int, updatePeriod time.Duration) *Monitor {
 	m := Monitor{
-		bus: make(chan Updates),
-		c:   newCache(cacheSize),
+		bus:          make(chan Updates),
+		c:            newCache(cacheSize),
+		updatePeriod: updatePeriod,
 	}
 	go m.background()
 	return &m
@@ -98,42 +99,149 @@ func NewMonitor(cacheSize int) *Monitor {
 
 func (m *Monitor) background() {
 	for u := range m.bus {
-		// fmt.Println("~~~~~~Recieved ", u)
-		// TODO: all of this needs to happen on a separate goroutine
-		//  This function should just send a message down a channel
-		// Should append or update existing?
-		// If existing does not exist
-		// If existing is errored
-		// If current is errored
-		// If existing is more than an hour old
-		m.c.Add(u)
-		// fmt.Println("Added")
+		if m.lastSuccessfulUpdateTime == nil {
+			u.SuccessLatency.Max = -1
+			u.SuccessLatency.Mean = -1
+		} else {
+			u.SuccessLatency.Max = u.LastTime.Sub(*m.lastSuccessfulUpdateTime).Round(100 * time.Millisecond)
+			u.SuccessLatency.Mean = u.LastTime.Sub(*m.lastSuccessfulUpdateTime).Round(100 * time.Millisecond)
+		}
+		if u.SuccessLatency.Mean >= 0 && u.SuccessLatency.Mean >= m.updatePeriod*3 {
+			u.SuccessLatency.Err = errors.New(
+				fmt.Sprintf(
+					"time elapsed is more than 3 times the target update period (%s)",
+					m.updatePeriod))
+		}
+		if !u.hasErr() {
+			lastTime := u.LastTime
+			m.lastSuccessfulUpdateTime = &lastTime
+		}
+		lastUpdate, exists := m.c.GetMostRecent()
+		if !exists {
+			m.c.Add(u)
+			continue
+		}
+		if !shouldMergeUpdates(lastUpdate, u) {
+			m.c.Add(u)
+			continue
+		}
+		m.c.UpdateMostRecent(merge(lastUpdate, u))
 	}
+}
+
+func shouldMergeUpdates(last, new Updates) bool {
+	if last.hasErr() || new.hasErr() {
+		return false
+	}
+	if last.SuccessLatency.Err != nil || new.SuccessLatency.Err != nil {
+		return false
+	}
+	if new.FirstTime.Sub(last.FirstTime) >= time.Hour {
+		return false
+	}
+	for stationID, _ := range new.StopIDToNumTrips {
+		if last.StopIDToNumTrips[stationID] != new.StopIDToNumTrips[stationID] {
+			return false
+		}
+	}
+	return true
+}
+
+func merge(last, new Updates) Updates {
+	last.LastTime = new.LastTime
+	if last.SuccessLatency.Max < new.SuccessLatency.Max {
+		last.SuccessLatency.Max = new.SuccessLatency.Max
+	}
+	if last.SuccessLatency.Mean < 0 {
+		last.SuccessLatency.Mean = new.SuccessLatency.Mean
+	} else {
+		total := int64(last.SuccessLatency.Mean)*last.Count + int64(new.SuccessLatency.Mean)
+		last.SuccessLatency.Mean = time.Duration(total / (last.Count + 1)).Round(100 * time.Millisecond)
+	}
+	last.Count = last.Count + 1
+	return last
 }
 
 // Updates contains information on one or more updates
 type Updates struct {
-	Count          int
+	Count          int64
 	FirstTime      time.Time
 	LastTime       time.Time
 	SuccessLatency struct {
-		Mean float64
-		Max  float64
+		Mean time.Duration
+		Max  time.Duration
+		Err  error
 	}
 	StopIDToErr      map[sourceapi.Station]error
 	StopIDToNumTrips map[sourceapi.Station]int
 	BuilderErr       error
 }
 
-func (u *Updates) TimeDescription() string {
-	return u.FirstTime.Format("2006-02-01 15:04:05")
+func (u *Updates) TimeDescription() template.HTML {
+	if u.Count == 1 {
+		return template.HTML(u.LastTime.Format("2006-02-01 15:04:05"))
+	}
+	return template.HTML(fmt.Sprintf("%s<br />|<br />(%d updates)<br />|<br />%s",
+		u.LastTime.Format("2006-02-01 15:04:05"),
+		u.Count,
+		u.FirstTime.Format("2006-02-01 15:04:05"),
+	))
 }
 
-func (u *Updates) StationDescription(station sourceapi.Station) string {
+func (u *Updates) StationDescription(station sourceapi.Station) template.HTML {
 	if u.StopIDToErr[station] != nil {
-		return "F"
+		return template.HTML(
+			fmt.Sprintf(`<span title="%s" class="hover">%s</span>`, u.StopIDToErr[station], "F"))
 	}
-	return fmt.Sprintf("%d", u.StopIDToNumTrips[station])
+	return template.HTML(fmt.Sprintf("%d", u.StopIDToNumTrips[station]))
+}
+
+func (u *Updates) StationClass(station sourceapi.Station) string {
+	if u.StopIDToErr[station] != nil {
+		return "failure"
+	}
+	return "success"
+}
+
+func (u *Updates) LatencyDescription() template.HTML {
+	if u.SuccessLatency.Mean < 0 {
+		if u.hasErr() {
+			return `<span title="no successful update yet" class="hover">N/A</span>`
+		}
+		return `<span title="this is the first successful update" class="hover">N/A</span>`
+	}
+	if u.SuccessLatency.Err != nil {
+		return template.HTML(
+			fmt.Sprintf(`<span title="%s" class="hover">%s</span>`, u.SuccessLatency.Err, u.SuccessLatency.Mean))
+	}
+	if u.Count == 1 {
+		return template.HTML(fmt.Sprintf("%s", u.SuccessLatency.Mean))
+	}
+	return template.HTML(fmt.Sprintf("mean<br />%s<br /><br />max<br>%s",
+		u.SuccessLatency.Mean, u.SuccessLatency.Max))
+}
+func (u *Updates) LatencyClass() template.HTML {
+	if u.SuccessLatency.Mean < 0 {
+		return ""
+	}
+	if u.SuccessLatency.Err != nil {
+		return "failure"
+	}
+	return "success"
+}
+
+func (u *Updates) BuilderDescription() template.HTML {
+	if u.BuilderErr != nil {
+		return template.HTML(fmt.Sprintf(`<span title="%s" class="hover">F</span>`, u.BuilderErr))
+	}
+	return "S"
+}
+
+func (u *Updates) BuilderClass() template.HTML {
+	if u.BuilderErr != nil {
+		return "failure"
+	}
+	return "success"
 }
 
 func (u *Updates) hasErr() bool {
@@ -155,12 +263,14 @@ type StationUpdateResult struct {
 
 func (m *Monitor) RecordUpdate(
 	stopIDToErr map[sourceapi.Station]StationUpdateResult, builderErr error) {
+	t := time.Now()
 	u := Updates{
 		BuilderErr:       builderErr,
 		StopIDToNumTrips: map[sourceapi.Station]int{},
 		StopIDToErr:      map[sourceapi.Station]error{},
-		FirstTime:        time.Now(),
-		LastTime:         time.Now(),
+		FirstTime:        t,
+		LastTime:         t,
+		Count:            1,
 	}
 	for stopID, result := range stopIDToErr {
 		u.StopIDToNumTrips[stopID] = result.NumTrips
@@ -180,5 +290,28 @@ func (m *Monitor) WriteHTML(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return tmpl.Execute(w, m.c.Copy())
+	data := struct {
+		StationIDs   []sourceapi.Station
+		StationNames []string
+		Updates      []Updates
+	}{
+		StationIDs: []sourceapi.Station{10, 11, 12, 13, 9, 5, 4, 2, 8, 3, 1, 7, 6},
+		StationNames: []string{
+			"9th St",
+			"14th St",
+			"23rd St",
+			"33rd St",
+			"Christopher St",
+			"Exchange Pl",
+			"Grove St",
+			"Harrison",
+			"Hoboken",
+			"Journal Sq",
+			"Newark",
+			"Newport",
+			"WTC",
+		},
+		Updates: m.c.Copy(),
+	}
+	return tmpl.Execute(w, data)
 }

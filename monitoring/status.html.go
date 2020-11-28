@@ -9,12 +9,20 @@ const statusHtmlTemplate = `
     <title>PATH Train GTFS Realtime feed</title>
 
 <style>
+html {
+
+}
 body {
   font-family: Helvetica, sans-serif;
   line-height: 1.4em;
 }
 
+h1, h2 {
+  text-align: center;
+}
+
 table{
+	margin: 0px auto;
   color: #666;
   text-align: center;
 }
@@ -30,11 +38,18 @@ table td {
   text-align: center;
 }
 
+.hover {
+	cursor: help;
+text-decoration:underline;
+text-decoration-style: dotted;
+}
+
 #spacer {
   width: 0px;
   padding: 4px;
 }
 td.time {
+	padding: 4px; 
   color: #666;
 }
 td.station {
@@ -57,7 +72,7 @@ table tr td.success {
   color: white;
 }
 
-table tr td.fail {
+table tr td.failure {
   background-color: #db4545;
   vertical-align: middle;
   text-align: center;
@@ -70,14 +85,16 @@ table tr td.fail {
 </style>
 </head>
 
-<body style="font-family: Helvetica, sans-serif; ">
+<body>
 
-
-
+	<h1>PATH GTFS Realtime Status Page</h1>
+	<h2>History</h2>
 	<table>
   <tr>
   <td></td>
-    <td colspan="13" id="razza">Source API</td>
+    <td colspan="13" id="razza"><h3>Source API</h3>
+	Number of stop time updates retrieved or<br />
+	F if the data retrieval for the station failed
     <td id="spacer"></td>
     <td></td>
     <td id="spacer"></td>
@@ -85,45 +102,29 @@ table tr td.fail {
   </tr>
     <tr style="height: 120px; ">
       <td></td>
-      <td class="station">9th&nbsp;St</td>
-      <td class="station">14th&nbsp;St</td>
-      <td class="station">23rd&nbsp;St</td>
-      <td class="station">33rd&nbsp;St</td>
-      <td class="station">Christopher&nbsp;St</td>
-      <td class="station">Exchange&nbsp;Pl</td>
-      <td class="station">Grove&nbsp;St</td>
-      <td class="station">Harrison</td>
-      <td class="station">Hoboken</td>
-      <td class="station">Journal&nbsp;Sq</td>
-      <td class="station">Newark</td>
-      <td class="station">Newport</td>
-      <td class="station">WTC</td>
+{{range .StationNames }}
+    <td class="station">{{.}}</td>
+{{end}}
     <td id="spacer"></td>
       <td style="width: 70px; ">GTFS Builder</td>
     <td id="spacer"></td>
-      <td style="width: 70px; ">Total feed update latency</td>
+      <td style="width: 70px; ">Time elapsed since last successful feed update</td>
     </tr>
 
-{{range .}}
+{{ $updates := .Updates }}
+{{ $stationsIDs := .StationIDs }}
+{{range $u := .Updates}}
+
 		<tr>
-      <td class="time">{{ .TimeDescription }}</td>
-			<td class="success">{{ .StationDescription 10 }}</td>
-			<td class="success">{{ .StationDescription 11 }}</td>
-			<td class="success">{{ .StationDescription 12 }}</td>
-			<td class="success">{{ .StationDescription 13 }}</td>
-			<td class="success">{{ .StationDescription 9 }}</td>
-			<td class="success">{{ .StationDescription 5 }}</td>
-			<td class="success">{{ .StationDescription 4 }}</td>
-			<td class="success">{{ .StationDescription 2 }}</td>
-			<td class="success">{{ .StationDescription 8 }}</td>
-			<td class="success">{{ .StationDescription 3 }}</td>
-			<td class="success">{{ .StationDescription 1 }}</td>
-			<td class="success">{{ .StationDescription 7 }}</td>
-			<td class="success">{{ .StationDescription 6 }}</td>
+      <td class="time">{{ $u.TimeDescription }}</td>
+{{range $s := $stationsIDs}}
+
+			<td class="{{ $u.StationClass $s }}">{{ $u.StationDescription $s }}</td>
+{{end}}
     <td id="spacer"></td>
-			<td class="success">S</td>
+			<td class="{{ $u.BuilderClass }}">{{ $u.BuilderDescription }}</td>
     <td id="spacer"></td>
-			<td class="success">S</td>
+			<td class="{{ $u.LatencyClass }}">{{ $u.LatencyDescription }}</td>
 		</tr>
 {{end}}
 	</table>
