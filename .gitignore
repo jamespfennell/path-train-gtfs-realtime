@@ -3,7 +3,7 @@ path-train-gtfs-realtime
 feed/sourceapi/google
 git
 pathgtfsrt
-
+.DS_Store
 .idea
 # Binaries for programs and plugins
 *.exe
