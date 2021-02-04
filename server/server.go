@@ -9,14 +9,13 @@ import (
 	"net/http"
 )
 
-func Run(port int, f *feed.Feed, monitor *monitoring.Monitor) {
+func Run(port int, f *feed.Feed) {
+	go monitoring.Listen(f.AddUpdateBroadcaster())
+
 	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/feed", feedHandlerFactory(f))
-	http.HandleFunc("/feed/", feedHandlerFactory(f))
-	http.HandleFunc("/status", htmlHandlerFactory(monitor))
-	http.HandleFunc("/status/", htmlHandlerFactory(monitor))
-	http.HandleFunc("/status/json", jsonHandlerFactory(monitor))
-	http.HandleFunc("/status/json/", jsonHandlerFactory(monitor))
+	http.Handle("/gtfsrt", monitoring.CountRequests(f.HttpHandler()))
+	http.Handle("/metrics", monitoring.HttpHandler())
+
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
@@ -30,34 +29,5 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-}
-
-func feedHandlerFactory(f *feed.Feed) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO: set content type
-		_, err := w.Write(f.Get())
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
-func jsonHandlerFactory(m *monitoring.Monitor) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		err := m.WriteJson(w)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
-func htmlHandlerFactory(m *monitoring.Monitor) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := m.WriteHTML(w)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
 	}
 }

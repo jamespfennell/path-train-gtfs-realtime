@@ -32,9 +32,8 @@ li {
 <div style="width: 600px; margin: 10px auto;">
 	<h1>PATH Train GTFS Realtime</h1>
 	<ul>
-		<li><a href="./feed/">Data feed</a></li>
-		<li><a href="./status/">Status page</a></li>
-		<li><a href="./status/json/">JSON status blob</a></li>
+		<li><a href="./gtfsrt">Data feed</a></li>
+		<li><a href="./metrics">Prometheus metrics endpoint</a></li>
 		<li><a href="https://github.com/jamespfennell/path-train-gtfs-realtime/">Github repository</a></li>
 	</ul>
 </div>

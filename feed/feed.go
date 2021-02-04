@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/feed/gtfsrt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
-	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
@@ -62,12 +61,23 @@ func (s *source) initializeData() error {
 	return nil
 }
 
+type StationUpdateResult struct {
+	NumTripsNY int
+	NumTripsNJ int
+	Err        error
+}
+
+type UpdateResult struct {
+	StationsToResult map[sourceapi.Station]StationUpdateResult
+	GtfsBuilderErr   error
+}
+
 // Update the sourceData structure using the most recent stations data from the API.
 // If data for one of the stations cannot be retrieved, the old data will be preserved.
 // This method is highly I/O bound: the time it takes to execute is largely spent waiting for HTTP responses
 // from the 14 station endpoints.
 // To speed it up, the 14 endpoints are hit in parallel.
-func (s *source) updateData() map[sourceapi.Station]monitoring.StationUpdateResult {
+func (s *source) updateData() map[sourceapi.Station]StationUpdateResult {
 	type trainsAtStation struct {
 		Station sourceapi.Station
 		Trains  []Train
@@ -82,13 +92,20 @@ func (s *source) updateData() map[sourceapi.Station]monitoring.StationUpdateResu
 			allTrainsAtStations <- r
 		}()
 	}
-	result := map[sourceapi.Station]monitoring.StationUpdateResult{}
+	result := map[sourceapi.Station]StationUpdateResult{}
 	for range s.data.stationToStopId {
 		trainsAtStation := <-allTrainsAtStations
-		result[trainsAtStation.Station] = monitoring.StationUpdateResult{
-			Err:      trainsAtStation.Err,
-			NumTrips: len(trainsAtStation.Trains),
+		stationResult := StationUpdateResult{
+			Err: trainsAtStation.Err,
 		}
+		for _, t := range trainsAtStation.Trains {
+			if t.Direction == sourceapi.Direction_TO_NJ {
+				stationResult.NumTripsNJ += 1
+			} else {
+				stationResult.NumTripsNY += 1
+			}
+		}
+		result[trainsAtStation.Station] = stationResult
 		if trainsAtStation.Err != nil {
 			fmt.Println("There was an error when retrieving data for station",
 				s.data.stationToStopId[trainsAtStation.Station])
@@ -385,7 +402,12 @@ func (f *Feed) update() {
 	result := f.source.updateData()
 	feedMessage := buildGtfsRealtimeFeedMessage(&f.source.data)
 	out, err := proto.Marshal(feedMessage)
-	f.monitor.RecordUpdate(result, err)
+	for _, l := range f.listeners {
+		l <- UpdateResult{
+			result,
+			err,
+		}
+	}
 	if err != nil {
 		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
 		return
@@ -397,13 +419,13 @@ func (f *Feed) update() {
 }
 
 type Feed struct {
-	gtfs    []byte
-	mutex   sync.RWMutex
-	source  source
-	monitor *monitoring.Monitor
+	gtfs      []byte
+	mutex     sync.RWMutex
+	source    source
+	listeners []chan<- UpdateResult
 }
 
-func (f *Feed) runInBackground(initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
+func (f *Feed) run(initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
 	// TODO: use log instead
 	fmt.Println("Starting up")
 	if !useHTTPSourceAPI {
@@ -438,10 +460,16 @@ func (f *Feed) runInBackground(initChan chan<- error, updatePeriod, timeoutPerio
 	}
 }
 
-func NewFeed(monitor *monitoring.Monitor, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
+func (f *Feed) AddUpdateBroadcaster() <-chan UpdateResult {
+	c := make(chan UpdateResult)
+	f.listeners = append(f.listeners, c)
+	return c
+}
+
+func NewFeed(updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
 	initChan := make(chan error)
-	f := Feed{monitor: monitor}
-	go f.runInBackground(initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
+	f := Feed{}
+	go f.run(initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
 	return &f, <-initChan
 }
 
@@ -451,4 +479,13 @@ func (f *Feed) Get() []byte {
 	r := make([]byte, len(f.gtfs))
 	copy(r, f.gtfs)
 	return r
+}
+
+func (f *Feed) HttpHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write(f.Get())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
 }

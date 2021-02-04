@@ -31,7 +31,7 @@ Some important notes:
 ## Running the application
 
 The application is an HTTP server with the
-    GTFS Realtime feed available at the `/feed/` path.
+    GTFS Realtime feed available at the `/gtfsrt` path.
 In the background, the program periodically retrieves data from the Razza API
     and updates the feed.
 By default, this update occurs every 5 seconds.
@@ -97,6 +97,23 @@ After start-up, any further errors encountered are handled gracefully,
     and the server will not exit until interrupted.
 If, during a particular update, the realtime data for a specific stop cannot be retrieved, or is malformed,
 then the previously retrieved data will be used.
+
+### Monitoring
+
+The application exports operational metrics in Prometheus format on the `/metrics` endpoint.
+The following metrics are exported.
+They are all gauges unless noted otherwise.
+
+- `path_train_gtfsrt_succesful_update_latency`: the time in seconds since the last successful update.
+- `path_train_gtfsrt_num_updates`: the number of updates that have occurred. This is a counter.
+        It has one label `has_error` which filters on updates that errored.
+- `path_train_gtfsrt_update_time`: the Unix timestamp of the last update.
+        It has one label `has_error` which filters on updates that errored.
+- `path_train_gtfsrt_num_trip_stop_times`: the number of trip stop times in the current version of the feed.
+        There are two labels for this metric: the direction (`NY` or `NJ`) and the station ID.
+- `path_train_gtfsrt_succesful_update_latency`: the time in seconds since the last successful update.
+- `path_train_gtfsrt_succesful_num_requests`: the number of times the feed was downloaded. This is a counter.
+        It has one label `code` which is the HTTP status code of the response.
 
 ## Licence notes
 

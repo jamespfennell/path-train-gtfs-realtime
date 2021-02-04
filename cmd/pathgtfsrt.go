@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
-	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 	"github.com/jamespfennell/path-train-gtfs-realtime/server"
 	"os"
 	"time"
@@ -19,11 +18,10 @@ func main() {
 		"use the HTTP source API instead of the default gRPC API")
 	flag.Parse()
 
-	m := monitoring.NewMonitor(100, *updatePeriod)
-	f, err := feed.NewFeed(m, *updatePeriod, *timeoutPeriod, *useHTTPSourceAPI)
+	f, err := feed.NewFeed(*updatePeriod, *timeoutPeriod, *useHTTPSourceAPI)
 	if err != nil {
 		fmt.Println("Failed to initialize feed:", err)
 		os.Exit(1)
 	}
-	server.Run(*port, f, m)
+	server.Run(*port, f)
 }
