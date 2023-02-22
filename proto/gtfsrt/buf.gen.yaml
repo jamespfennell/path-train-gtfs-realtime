@@ -1,0 +1,9 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:    
+    default: github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt
+plugins:
+  - name: go
+    out: .
+    opt: paths=source_relative

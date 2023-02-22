@@ -1,0 +1,4 @@
+version: v1
+name: buf.build/jamespfennell/path-train-gtfs-realtime-sourceapi
+deps:
+  - buf.build/googleapis/googleapis

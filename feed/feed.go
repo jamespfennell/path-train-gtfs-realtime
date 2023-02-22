@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/google/uuid"
-	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/feed/gtfsrt"
-	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
-	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/google/uuid"
+	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt"
+	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
+	"google.golang.org/grpc"
 )
 
 const (

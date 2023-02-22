@@ -1,44 +1,26 @@
-# The first step is to retrieve the proto files for the GTFS Realtime spec and the
-# source gRPC API. The protoc Docker image used to build these is based on Alpine
-# Linux and doesn't have the necessary facilities (git, make) to get the protos.
-# This is why we do it in a separate stage.
-FROM buildpack-deps:buster AS get-protos
+FROM golang:1.19 AS build
 
 WORKDIR /build
-ADD Makefile .
-RUN make get-protos
 
-FROM namely/grpc-cli as build-protos
-
-COPY --from=get-protos /build /build
-WORKDIR /build
-RUN protoc --go_out=./gtfsrt  --proto_path=./gtfsrt ./gtfsrt/*.proto
-RUN protoc --go_out=plugins=grpc:./sourceapi  --proto_path=/opt/include --proto_path=./sourceapi ./sourceapi/*.proto
-
-FROM golang:1.14 AS build-go
-
-# Dependencies. These come first to take advantage of Docker caching.
-ENV GO111MODULE=on
-WORKDIR /build
-COPY go.mod .
-COPY go.sum .
+COPY go.mod ./
+COPY go.sum ./
 RUN go mod download
 
-# We're intentionally only copying over the files that are also kept in source control
-# so that the Docker build replicates the bare metal build.
-COPY --from=build-protos /build/gtfsrt/* /build/gtfsrt/
-COPY --from=build-protos /build/sourceapi/* /build/sourceapi/
+# Install all the code generation tools.
+RUN go install \
+    google.golang.org/protobuf/cmd/protoc-gen-go \
+    google.golang.org/grpc/cmd/protoc-gen-go-grpc
+RUN curl -sSL "https://github.com/bufbuild/buf/releases/download/v1.13.1/buf-$(uname -s)-$(uname -m)" \
+    -o "/usr/bin/buf"
+RUN chmod +x "/usr/bin/buf"
 
 COPY . .
+
+RUN cd proto/gtfsrt && buf generate
+RUN cd proto/sourceapi && buf generate
 RUN go build cmd/pathgtfsrt.go
+RUN go test ./...
 
-# As is standard, we copy over the built binary to its own Docker image so the
-# resulting image does not have redundant Go build infrastructure and artifacts.
 FROM debian:buster
-
-COPY --from=build-go /build/pathgtfsrt /usr/local/bin/
-
-RUN mkdir /output
-ENV PATH_GTFS_RT_OUTPUT_PATH=/output/gtfsrt
-
+COPY --from=build /build/pathgtfsrt /usr/local/bin/
 ENTRYPOINT ["pathgtfsrt"]

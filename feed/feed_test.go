@@ -1,7 +1,10 @@
 package feed
 
-import s "github.com/jamespfennell/path-train-gtfs-realtime/feed/sourceapi"
-import "testing"
+import (
+	"testing"
+
+	s "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
+)
 
 var flagtests = []struct {
 	in  string

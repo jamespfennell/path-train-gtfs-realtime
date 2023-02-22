@@ -1,13 +1,18 @@
 package server
 
 import (
+	_ "embed"
 	"fmt"
-	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
-	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
+	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
 )
+
+//go:embed index.html
+var indexHTMLPage string
 
 func Run(port int, f *feed.Feed) {
 	go monitoring.Listen(f.AddUpdateBroadcaster())
