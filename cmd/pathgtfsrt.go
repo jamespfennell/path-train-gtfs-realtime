@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
-	"github.com/jamespfennell/path-train-gtfs-realtime/server"
 	"os"
 	"time"
+
+	"github.com/jamespfennell/path-train-gtfs-realtime/server"
 )
 
 func main() {
@@ -17,11 +18,13 @@ func main() {
 	useHTTPSourceAPI := flag.Bool("use_http_source_api", false,
 		"use the HTTP source API instead of the default gRPC API")
 	flag.Parse()
-
-	f, err := feed.NewFeed(*updatePeriod, *timeoutPeriod, *useHTTPSourceAPI)
-	if err != nil {
-		fmt.Println("Failed to initialize feed:", err)
+	if err := server.Run(context.Background(), server.RunArgs{
+		Port:             *port,
+		UpdatePeriod:     *updatePeriod,
+		TimeoutPeriod:    *timeoutPeriod,
+		UseHTTPSourceAPI: *useHTTPSourceAPI,
+	}); err != nil {
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	server.Run(*port, f)
 }

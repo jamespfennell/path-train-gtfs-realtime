@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/uuid"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -45,13 +46,13 @@ type sourceData struct {
 
 // Initialize the sourceData data structure by populating its stop and route fields.
 // If the initialization fails, the program exits.
-func (s *source) initializeData() error {
+func (s *source) initializeData(ctx context.Context) error {
 	var err error
-	s.data.routeToRouteId, err = s.client.GetRouteToRouteId()
+	s.data.routeToRouteId, err = s.client.GetRouteToRouteId(ctx)
 	if err != nil {
 		return err
 	}
-	s.data.stationToStopId, err = s.client.GetStationToStopId()
+	s.data.stationToStopId, err = s.client.GetStationToStopId(ctx)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ type UpdateResult struct {
 // This method is highly I/O bound: the time it takes to execute is largely spent waiting for HTTP responses
 // from the 14 station endpoints.
 // To speed it up, the 14 endpoints are hit in parallel.
-func (s *source) updateData() map[sourceapi.Station]StationUpdateResult {
+func (s *source) updateData(ctx context.Context) map[sourceapi.Station]StationUpdateResult {
 	type trainsAtStation struct {
 		Station sourceapi.Station
 		Trains  []Train
@@ -89,7 +90,7 @@ func (s *source) updateData() map[sourceapi.Station]StationUpdateResult {
 		station := station
 		go func() {
 			r := trainsAtStation{Station: station}
-			r.Trains, r.Err = s.client.GetTrainsAtStation(station)
+			r.Trains, r.Err = s.client.GetTrainsAtStation(ctx, station)
 			allTrainsAtStations <- r
 		}()
 	}
@@ -131,9 +132,9 @@ func convertDirectionToBoolean(direction sourceapi.Direction) *uint32 {
 
 // sourceClient is a way to get data from the Razza API
 type sourceClient interface {
-	GetStationToStopId() (map[sourceapi.Station]string, error)
-	GetRouteToRouteId() (map[sourceapi.Route]string, error)
-	GetTrainsAtStation(sourceapi.Station) ([]Train, error)
+	GetStationToStopId(context.Context) (map[sourceapi.Station]string, error)
+	GetRouteToRouteId(context.Context) (map[sourceapi.Route]string, error)
+	GetTrainsAtStation(context.Context, sourceapi.Station) ([]Train, error)
 	Close() error
 }
 
@@ -141,7 +142,7 @@ type httpClient struct {
 	timeoutPeriod time.Duration
 }
 
-func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) ([]Train, error) {
+func (client *httpClient) GetTrainsAtStation(_ context.Context, station sourceapi.Station) ([]Train, error) {
 	type jsonUpcomingTrain struct {
 		ProjectedArrival  string
 		LastUpdated       string
@@ -174,7 +175,7 @@ func (client *httpClient) GetTrainsAtStation(station sourceapi.Station) ([]Train
 	return trains, nil
 }
 
-func (client *httpClient) GetStationToStopId() (map[sourceapi.Station]string, error) {
+func (client *httpClient) GetStationToStopId(_ context.Context) (map[sourceapi.Station]string, error) {
 	stationsContent, err := client.getContent(apiStationsEndpoint)
 	if err != nil {
 		return nil, err
@@ -198,7 +199,7 @@ func (client *httpClient) GetStationToStopId() (map[sourceapi.Station]string, er
 	return stationToStopId, nil
 }
 
-func (client *httpClient) GetRouteToRouteId() (map[sourceapi.Route]string, error) {
+func (client *httpClient) GetRouteToRouteId(_ context.Context) (map[sourceapi.Route]string, error) {
 	routesContent, err := client.getContent(apiRoutesEndpoint)
 	if err != nil {
 		return nil, err
@@ -257,7 +258,7 @@ func (client httpClient) getContent(endpoint string) (bytes []byte, err error) {
 			err = closingErr
 		}
 	}()
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 type grpcClient struct {
@@ -268,7 +269,7 @@ type grpcClient struct {
 }
 
 func newGrpcClient(timeoutPeriod time.Duration) (*grpcClient, error) {
-	conn, err := grpc.Dial(grpcApiUrl, grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcApiUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
@@ -277,8 +278,10 @@ func newGrpcClient(timeoutPeriod time.Duration) (*grpcClient, error) {
 	return &grpcClient{conn: conn, stations: &stationsClient, routes: &routesClient, timeoutPeriod: timeoutPeriod}, nil
 }
 
-func (client *grpcClient) GetStationToStopId() (stationToStopId map[sourceapi.Station]string, err error) {
-	response, err := (*client.stations).ListStations(client.createContext(), &sourceapi.ListStationsRequest{})
+func (client *grpcClient) GetStationToStopId(ctx context.Context) (stationToStopId map[sourceapi.Station]string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, client.timeoutPeriod)
+	defer cancel()
+	response, err := (*client.stations).ListStations(ctx, &sourceapi.ListStationsRequest{})
 	if err != nil {
 		return
 	}
@@ -289,8 +292,10 @@ func (client *grpcClient) GetStationToStopId() (stationToStopId map[sourceapi.St
 	return
 }
 
-func (client *grpcClient) GetRouteToRouteId() (routeToRouteId map[sourceapi.Route]string, err error) {
-	response, err := (*client.routes).ListRoutes(client.createContext(), &sourceapi.ListRoutesRequest{})
+func (client *grpcClient) GetRouteToRouteId(ctx context.Context) (routeToRouteId map[sourceapi.Route]string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, client.timeoutPeriod)
+	defer cancel()
+	response, err := (*client.routes).ListRoutes(ctx, &sourceapi.ListRoutesRequest{})
 	if err != nil {
 		return
 	}
@@ -305,9 +310,11 @@ func (client *grpcClient) Close() error {
 	return client.conn.Close()
 }
 
-func (client *grpcClient) GetTrainsAtStation(station sourceapi.Station) ([]Train, error) {
+func (client *grpcClient) GetTrainsAtStation(ctx context.Context, station sourceapi.Station) ([]Train, error) {
+	ctx, cancel := context.WithTimeout(ctx, client.timeoutPeriod)
+	defer cancel()
 	request := sourceapi.GetUpcomingTrainsRequest{Station: station}
-	response, err := (*client.stations).GetUpcomingTrains(client.createContext(), &request)
+	response, err := (*client.stations).GetUpcomingTrains(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +323,6 @@ func (client *grpcClient) GetTrainsAtStation(station sourceapi.Station) ([]Train
 		trains = append(trains, train)
 	}
 	return trains, nil
-}
-
-func (client *grpcClient) createContext() context.Context {
-	deadline := time.Now().Add(client.timeoutPeriod)
-	ctx, _ := context.WithDeadline(context.Background(), deadline)
-	return ctx
 }
 
 // (3)
@@ -398,9 +399,9 @@ func newPseudoTripId() string {
 // (4)
 
 // Run one feed update iteration.
-func (f *Feed) update() {
+func (f *Feed) update(ctx context.Context) {
 	fmt.Println("Updating GTFS Realtime feed.")
-	result := f.source.updateData()
+	result := f.source.updateData(ctx)
 	feedMessage := buildGtfsRealtimeFeedMessage(&f.source.data)
 	out, err := proto.Marshal(feedMessage)
 	for _, l := range f.listeners {
@@ -426,7 +427,7 @@ type Feed struct {
 	listeners []chan<- UpdateResult
 }
 
-func (f *Feed) run(initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
+func (f *Feed) run(ctx context.Context, initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
 	// TODO: use log instead
 	fmt.Println("Starting up")
 	if !useHTTPSourceAPI {
@@ -447,17 +448,17 @@ func (f *Feed) run(initChan chan<- error, updatePeriod, timeoutPeriod time.Durat
 			fmt.Println("Error while closing client connection:", err.Error())
 		}
 	}()
-	err := f.source.initializeData()
+	err := f.source.initializeData(ctx)
 	if err != nil {
 		initChan <- err
 		return
 	}
 	// Signal that initialization completed successfully
 	close(initChan)
-	f.update()
+	f.update(ctx)
 	ticker := time.NewTicker(updatePeriod)
 	for range ticker.C {
-		f.update()
+		f.update(ctx)
 	}
 }
 
@@ -467,10 +468,10 @@ func (f *Feed) AddUpdateBroadcaster() <-chan UpdateResult {
 	return c
 }
 
-func NewFeed(updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
+func NewFeed(ctx context.Context, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
 	initChan := make(chan error)
 	f := Feed{}
-	go f.run(initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
+	go f.run(ctx, initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
 	return &f, <-initChan
 }
 

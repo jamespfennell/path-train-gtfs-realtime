@@ -1,11 +1,12 @@
 package server
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/jamespfennell/path-train-gtfs-realtime/feed"
 	"github.com/jamespfennell/path-train-gtfs-realtime/monitoring"
@@ -14,14 +15,25 @@ import (
 //go:embed index.html
 var indexHTMLPage string
 
-func Run(port int, f *feed.Feed) {
+type RunArgs struct {
+	Port             int
+	UpdatePeriod     time.Duration
+	TimeoutPeriod    time.Duration
+	UseHTTPSourceAPI bool
+}
+
+func Run(ctx context.Context, args RunArgs) error {
+	f, err := feed.NewFeed(ctx, args.UpdatePeriod, args.TimeoutPeriod, args.UseHTTPSourceAPI)
+	if err != nil {
+		return fmt.Errorf("failed to initialize feed: %s", err)
+	}
 	go monitoring.Listen(f.AddUpdateBroadcaster())
 
 	http.HandleFunc("/", rootHandler)
 	http.Handle("/gtfsrt", monitoring.CountRequests(f.HttpHandler()))
 	http.Handle("/metrics", monitoring.HttpHandler())
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	return http.ListenAndServe(fmt.Sprintf(":%d", args.Port), nil)
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
