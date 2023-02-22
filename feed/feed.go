@@ -2,6 +2,7 @@ package feed
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/google/uuid"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
 	"google.golang.org/grpc"
@@ -329,71 +329,47 @@ func (client *grpcClient) GetTrainsAtStation(ctx context.Context, station source
 
 // Build a GTFS Realtime message from a snapshot of the current data.
 func buildGtfsRealtimeFeedMessage(data *sourceData) *gtfs.FeedMessage {
-	gtfsVersion := "0.2"
-	incrementality := gtfs.FeedHeader_FULL_DATASET
-	currentTimestamp := uint64(time.Now().Unix())
-	feedMessage := gtfs.FeedMessage{
-		Header: &gtfs.FeedHeader{
-			GtfsRealtimeVersion: &gtfsVersion,
-			Incrementality:      &incrementality,
-			Timestamp:           &currentTimestamp,
-		},
-		Entity: []*gtfs.FeedEntity{},
-	}
+	var entities []*gtfs.FeedEntity
 	for apiStationId, trains := range data.stationIdToUpcomingTrains {
 		for _, train := range trains {
-			tripId := newPseudoTripId()
-			tripUpdate, err := convertApiTrainToTripUpdate(data, train, tripId, apiStationId)
+			update := &gtfs.TripUpdate{
+				Trip: &gtfs.TripDescriptor{
+					RouteId:     ptr(data.routeToRouteId[train.Route]),
+					DirectionId: convertDirectionToBoolean(train.Direction),
+				},
+				StopTimeUpdate: []*gtfs.TripUpdate_StopTimeUpdate{
+					{
+						StopId: ptr(data.stationToStopId[apiStationId]),
+						Arrival: &gtfs.TripUpdate_StopTimeEvent{
+							Time: ptr(train.ProjectedArrival.Seconds),
+						},
+					},
+				},
+				Timestamp: ptr(uint64(train.LastUpdated.Seconds)),
+			}
+			b, err := json.Marshal(update)
 			if err != nil {
-				continue
+				panic(err)
 			}
-			feedEntity := gtfs.FeedEntity{
-				Id:         &tripId,
-				TripUpdate: tripUpdate,
-			}
-			feedMessage.Entity = append(feedMessage.Entity, &feedEntity)
+			update.Trip.TripId = ptr(fmt.Sprintf("%x", md5.Sum(b)))
+			entities = append(entities, &gtfs.FeedEntity{
+				Id:         update.Trip.TripId,
+				TripUpdate: update,
+			})
 		}
 	}
-	return &feedMessage
+	return &gtfs.FeedMessage{
+		Header: &gtfs.FeedHeader{
+			GtfsRealtimeVersion: ptr("0.2"),
+			Incrementality:      ptr(gtfs.FeedHeader_FULL_DATASET),
+			Timestamp:           ptr(uint64(time.Now().Unix())),
+		},
+		Entity: entities,
+	}
 }
 
-func convertApiTrainToTripUpdate(
-	data *sourceData,
-	train *sourceapi.GetUpcomingTrainsResponse_UpcomingTrain,
-	tripId string,
-	station sourceapi.Station) (update *gtfs.TripUpdate, err error) {
-	lastUpdatedUnsigned := uint64(train.LastUpdated.Seconds)
-	arrivalTime := train.ProjectedArrival.Seconds
-	stopId := data.stationToStopId[station]
-	route := train.Route
-	routeId := data.routeToRouteId[route]
-	stopTimeUpdate := gtfs.TripUpdate_StopTimeUpdate{
-		StopSequence: nil,
-		StopId:       &stopId,
-		Arrival: &gtfs.TripUpdate_StopTimeEvent{
-			Time: &arrivalTime,
-		},
-	}
-	return &gtfs.TripUpdate{
-		Trip: &gtfs.TripDescriptor{
-			TripId:      &tripId,
-			RouteId:     &routeId,
-			DirectionId: convertDirectionToBoolean(train.Direction),
-		},
-		StopTimeUpdate: []*gtfs.TripUpdate_StopTimeUpdate{
-			&stopTimeUpdate,
-		},
-		Timestamp: &lastUpdatedUnsigned,
-	}, nil
-}
-
-func newPseudoTripId() string {
-	randomUuid, err := uuid.NewRandom()
-	if err != nil {
-		return ""
-	} else {
-		return randomUuid.String()
-	}
+func ptr[T any](t T) *T {
+	return &t
 }
 
 // (4)
