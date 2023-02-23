@@ -63,23 +63,12 @@ func (s *source) initializeData(ctx context.Context) error {
 	return nil
 }
 
-type StationUpdateResult struct {
-	NumTripsNY int
-	NumTripsNJ int
-	Err        error
-}
-
-type UpdateResult struct {
-	StationsToResult map[sourceapi.Station]StationUpdateResult
-	GtfsBuilderErr   error
-}
-
 // Update the sourceData structure using the most recent stations data from the API.
 // If data for one of the stations cannot be retrieved, the old data will be preserved.
 // This method is highly I/O bound: the time it takes to execute is largely spent waiting for HTTP responses
 // from the 14 station endpoints.
 // To speed it up, the 14 endpoints are hit in parallel.
-func (s *source) updateData(ctx context.Context) map[sourceapi.Station]StationUpdateResult {
+func (s *source) updateData(ctx context.Context) []error {
 	type trainsAtStation struct {
 		Station sourceapi.Station
 		Trains  []Train
@@ -94,28 +83,18 @@ func (s *source) updateData(ctx context.Context) map[sourceapi.Station]StationUp
 			allTrainsAtStations <- r
 		}()
 	}
-	result := map[sourceapi.Station]StationUpdateResult{}
+	var errs []error
 	for range s.data.stationToStopId {
 		trainsAtStation := <-allTrainsAtStations
-		stationResult := StationUpdateResult{
-			Err: trainsAtStation.Err,
-		}
-		for _, t := range trainsAtStation.Trains {
-			if t.Direction == sourceapi.Direction_TO_NJ {
-				stationResult.NumTripsNJ += 1
-			} else {
-				stationResult.NumTripsNY += 1
-			}
-		}
-		result[trainsAtStation.Station] = stationResult
 		if trainsAtStation.Err != nil {
+			errs = append(errs, trainsAtStation.Err)
 			fmt.Println("There was an error when retrieving data for station",
 				s.data.stationToStopId[trainsAtStation.Station])
 			continue
 		}
 		s.data.stationIdToUpcomingTrains[trainsAtStation.Station] = trainsAtStation.Trains
 	}
-	return result
+	return errs
 }
 
 func convertDirectionToBoolean(direction sourceapi.Direction) *uint32 {
@@ -377,31 +356,27 @@ func ptr[T any](t T) *T {
 // Run one feed update iteration.
 func (f *Feed) update(ctx context.Context) {
 	fmt.Println("Updating GTFS Realtime feed.")
-	result := f.source.updateData(ctx)
+	requestErrs := f.source.updateData(ctx)
 	feedMessage := buildGtfsRealtimeFeedMessage(&f.source.data)
 	out, err := proto.Marshal(feedMessage)
-	for _, l := range f.listeners {
-		l <- UpdateResult{
-			result,
-			err,
-		}
-	}
 	if err != nil {
-		fmt.Println("Update failed: there was an error while generating the realtime protobuf file. ")
-		return
+		panic(fmt.Sprintf("failed go generate realtime protobuf file: %s", err))
 	}
 	f.mutex.Lock()
-	defer f.mutex.Unlock()
 	f.gtfs = out
+	f.mutex.Unlock()
+	f.callback(feedMessage, requestErrs)
 	fmt.Println("Done")
 }
 
 type Feed struct {
-	gtfs      []byte
-	mutex     sync.RWMutex
-	source    source
-	listeners []chan<- UpdateResult
+	gtfs     []byte
+	mutex    sync.RWMutex
+	source   source
+	callback UpdateCallback
 }
+
+type UpdateCallback func(msg *gtfs.FeedMessage, err []error)
 
 func (f *Feed) run(ctx context.Context, initChan chan<- error, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) {
 	// TODO: use log instead
@@ -438,15 +413,11 @@ func (f *Feed) run(ctx context.Context, initChan chan<- error, updatePeriod, tim
 	}
 }
 
-func (f *Feed) AddUpdateBroadcaster() <-chan UpdateResult {
-	c := make(chan UpdateResult)
-	f.listeners = append(f.listeners, c)
-	return c
-}
-
-func NewFeed(ctx context.Context, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool) (*Feed, error) {
+func NewFeed(ctx context.Context, updatePeriod, timeoutPeriod time.Duration, useHTTPSourceAPI bool, callback UpdateCallback) (*Feed, error) {
 	initChan := make(chan error)
-	f := Feed{}
+	f := Feed{
+		callback: callback,
+	}
 	go f.run(ctx, initChan, updatePeriod, timeoutPeriod, useHTTPSourceAPI)
 	return &f, <-initChan
 }

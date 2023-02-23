@@ -23,11 +23,10 @@ type RunArgs struct {
 }
 
 func Run(ctx context.Context, args RunArgs) error {
-	f, err := feed.NewFeed(ctx, args.UpdatePeriod, args.TimeoutPeriod, args.UseHTTPSourceAPI)
+	f, err := feed.NewFeed(ctx, args.UpdatePeriod, args.TimeoutPeriod, args.UseHTTPSourceAPI, monitoring.RecordUpdate)
 	if err != nil {
 		return fmt.Errorf("failed to initialize feed: %s", err)
 	}
-	go monitoring.Listen(f.AddUpdateBroadcaster())
 
 	http.HandleFunc("/", rootHandler)
 	http.Handle("/gtfsrt", monitoring.CountRequests(f.HttpHandler()))
