@@ -24,7 +24,7 @@ const (
 	apiBaseUrl          = "https://path.api.razza.dev/v1/"
 	apiRoutesEndpoint   = "routes/"
 	apiStationsEndpoint = "stations/"
-	apiRealtimeEndpoint = "stations/%sourceapi/realtime/"
+	apiRealtimeEndpoint = "stations/%s/realtime/"
 )
 
 // (1)
