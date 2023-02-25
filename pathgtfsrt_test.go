@@ -1,4 +1,4 @@
-package feed
+package pathgtfsrt
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ var flagtests = []struct {
 }
 
 func TestConvertDirectionAsStringToDirection(t *testing.T) {
-	client := httpClient{}
+	client := HttpSourceClient{}
 
 	for _, testCase := range flagtests {
 		actual := client.convertDirectionAsStringToDirection(testCase.in)

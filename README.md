@@ -87,11 +87,8 @@ To regenerate them, it's probably just simplest to use the Docker build process.
 
 A number of errors can prevent the application from running 100% correctly,
     with the main source of errors being network failures when hitting the source API.
-At start-up, the application downloads some basic data from the API;
-    if this fails, the application will exit with one of the following exit codes:
-
-- `104` - there was an error retrieving [routes data](https://path.api.razza.dev/v1/routes) from the API (for example, network failure).
-- `105` - there was an error retrieving [stations data](https://path.api.razza.dev/v1/stations) from the API.
+At start-up, the application downloads static and realtime data from the API;
+    if this fails, the application will exit.
 
 After start-up, any further errors encountered are handled gracefully,
     and the server will not exit until interrupted.
@@ -100,20 +97,8 @@ then the previously retrieved data will be used.
 
 ### Monitoring
 
-The application exports operational metrics in Prometheus format on the `/metrics` endpoint.
-The following metrics are exported.
-They are all gauges unless noted otherwise.
-
-- `path_train_gtfsrt_succesful_update_latency`: the time in seconds since the last successful update.
-- `path_train_gtfsrt_num_updates`: the number of updates that have occurred. This is a counter.
-        It has one label `has_error` which filters on updates that errored.
-- `path_train_gtfsrt_update_time`: the Unix timestamp of the last update.
-        It has one label `has_error` which filters on updates that errored.
-- `path_train_gtfsrt_num_trip_stop_times`: the number of trip stop times in the current version of the feed.
-        There are two labels for this metric: the direction (`NY` or `NJ`) and the station ID.
-- `path_train_gtfsrt_succesful_update_latency`: the time in seconds since the last successful update.
-- `path_train_gtfsrt_succesful_num_requests`: the number of times the feed was downloaded. This is a counter.
-        It has one label `code` which is the HTTP status code of the response.
+The application exports metrics in Prometheus format on the `/metrics` endpoint.
+See `cmd/pathgtfsrt.go` for the metric definitions.
 
 ## Licence notes
 
