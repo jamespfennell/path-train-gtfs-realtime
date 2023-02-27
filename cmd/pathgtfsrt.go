@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	pathgtfsrt "github.com/jamespfennell/path-train-gtfs-realtime"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -81,7 +82,7 @@ func run(ctx context.Context) error {
 		sourceClient = grpcClient
 	}
 
-	f, err := pathgtfsrt.NewFeed(ctx, *updatePeriod, sourceClient, recordUpdate)
+	f, err := pathgtfsrt.NewFeed(ctx, clock.New(), *updatePeriod, sourceClient, recordUpdate)
 	if err != nil {
 		return fmt.Errorf("failed to initialize feed: %s", err)
 	}

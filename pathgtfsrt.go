@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	gtfs "github.com/jamespfennell/path-train-gtfs-realtime/proto/gtfsrt"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Train contains data about a PATH train at a specific station.
@@ -53,7 +56,7 @@ type UpdateCallback func(msg *gtfs.FeedMessage, requestErrs []error)
 // update period.
 //
 // After each update, including the first synchronous update, the provided callback is invoked.
-func NewFeed(ctx context.Context, updatePeriod time.Duration, sourceClient SourceClient, callback UpdateCallback) (*Feed, error) {
+func NewFeed(ctx context.Context, clock clock.Clock, updatePeriod time.Duration, sourceClient SourceClient, callback UpdateCallback) (*Feed, error) {
 	f := Feed{}
 	fmt.Println("Starting up")
 	staticData, err := getStaticData(ctx, sourceClient)
@@ -65,7 +68,7 @@ func NewFeed(ctx context.Context, updatePeriod time.Duration, sourceClient Sourc
 	updateFunc := func() []error {
 		fmt.Println("Updating GTFS Realtime feed.")
 		requestErrs := updateRealtimeData(ctx, realtimeData, sourceClient, staticData)
-		feedMessage := buildGtfsRealtimeFeedMessage(staticData, realtimeData)
+		feedMessage := buildGtfsRealtimeFeedMessage(clock, staticData, realtimeData)
 		out, err := proto.Marshal(feedMessage)
 		if err != nil {
 			panic(fmt.Sprintf("failed go generate realtime protobuf file: %s", err))
@@ -80,10 +83,19 @@ func NewFeed(ctx context.Context, updatePeriod time.Duration, sourceClient Sourc
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("failed to initialize realtime data: %v", errs)
 	}
+	// We ensure the ticker is constructed before the function is returned; otherwise,
+	// there is a race condition between initializing the ticker and incrementing the
+	// time in the unit testing which results in a deadlock.
+	ticker := clock.Ticker(updatePeriod)
 	go func() {
-		ticker := time.NewTicker(updatePeriod)
-		for range ticker.C {
-			updateFunc()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				updateFunc()
+			}
 		}
 	}()
 	return &f, nil
@@ -112,6 +124,7 @@ func (f *Feed) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // A container for the static data retrieved at the start.
 type staticData struct {
+	stations        []sourceapi.Station
 	stationToStopId map[sourceapi.Station]string
 	routeToRouteId  map[sourceapi.Route]string
 }
@@ -128,6 +141,12 @@ func getStaticData(ctx context.Context, sourceClient SourceClient) (staticData, 
 	if err != nil {
 		return staticData{}, err
 	}
+	for station := range s.stationToStopId {
+		s.stations = append(s.stations, station)
+	}
+	sort.Slice(s.stations, func(i, j int) bool {
+		return s.stations[i] < s.stations[j]
+	})
 	return s, nil
 }
 
@@ -165,8 +184,8 @@ func updateRealtimeData(ctx context.Context, data map[sourceapi.Station][]Train,
 }
 
 // Build a GTFS Realtime message from a snapshot of the current data.
-func buildGtfsRealtimeFeedMessage(staticData staticData, realtimeData map[sourceapi.Station][]Train) *gtfs.FeedMessage {
-	convertDirectionToBoolean := func(direction sourceapi.Direction) *uint32 {
+func buildGtfsRealtimeFeedMessage(clock clock.Clock, staticData staticData, realtimeData map[sourceapi.Station][]Train) *gtfs.FeedMessage {
+	directionToBoolean := func(direction sourceapi.Direction) *uint32 {
 		var result uint32
 		if direction == sourceapi.Direction_TO_NY {
 			result = 1
@@ -175,23 +194,49 @@ func buildGtfsRealtimeFeedMessage(staticData staticData, realtimeData map[source
 		}
 		return &result
 	}
+	timestamppbToInt64 := func(t *timestamppb.Timestamp) *int64 {
+		if t != nil {
+			return ptr(t.Seconds)
+		}
+		return nil
+	}
+	timestamppbToUint64 := func(t *timestamppb.Timestamp) *uint64 {
+		if t != nil {
+			return ptr(uint64(t.Seconds))
+		}
+		return nil
+	}
 	var entities []*gtfs.FeedEntity
-	for apiStationId, trains := range realtimeData {
+	for _, apiStationId := range staticData.stations {
+		trains := realtimeData[apiStationId]
 		for _, train := range trains {
+			routeID, ok := staticData.routeToRouteId[train.Route]
+			if !ok {
+				continue
+			}
+			if train.Direction != sourceapi.Direction_TO_NJ && train.Direction != sourceapi.Direction_TO_NY {
+				continue
+			}
+			if train.ProjectedArrival == nil {
+				continue
+			}
+			if train.LastUpdated == nil {
+				continue
+			}
 			update := &gtfs.TripUpdate{
 				Trip: &gtfs.TripDescriptor{
-					RouteId:     ptr(staticData.routeToRouteId[train.Route]),
-					DirectionId: convertDirectionToBoolean(train.Direction),
+					RouteId:     &routeID,
+					DirectionId: directionToBoolean(train.Direction),
 				},
 				StopTimeUpdate: []*gtfs.TripUpdate_StopTimeUpdate{
 					{
 						StopId: ptr(staticData.stationToStopId[apiStationId]),
 						Arrival: &gtfs.TripUpdate_StopTimeEvent{
-							Time: ptr(train.ProjectedArrival.Seconds),
+							Time: timestamppbToInt64(train.ProjectedArrival),
 						},
 					},
 				},
-				Timestamp: ptr(uint64(train.LastUpdated.Seconds)),
+				Timestamp: timestamppbToUint64(train.LastUpdated),
 			}
 			b, err := json.Marshal(update)
 			if err != nil {
@@ -207,8 +252,8 @@ func buildGtfsRealtimeFeedMessage(staticData staticData, realtimeData map[source
 	return &gtfs.FeedMessage{
 		Header: &gtfs.FeedHeader{
 			GtfsRealtimeVersion: ptr("0.2"),
-			Incrementality:      ptr(gtfs.FeedHeader_FULL_DATASET),
-			Timestamp:           ptr(uint64(time.Now().Unix())),
+			Incrementality:      gtfs.FeedHeader_FULL_DATASET.Enum(),
+			Timestamp:           ptr(uint64(clock.Now().Unix())),
 		},
 		Entity: entities,
 	}
