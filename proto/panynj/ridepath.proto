@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+message RidePathResponse {
+
+    message Messages {
+        string target = 1;
+        string secondsToArrival = 2;
+        string arrivalTimeMessage = 3;
+        string lineColor = 4;
+        string headSign = 5;
+        string lastUpdated = 6;
+    }
+
+    message Destinations {
+        string label = 1;
+        repeated Messages messages = 2;
+    }
+
+    message Results {
+        string consideredStation = 1;
+        repeated Destinations destinations = 2;
+    }
+
+    repeated Results results = 1;
+}
