@@ -418,6 +418,26 @@ func TestGetTrainsAtStation(t *testing.T) {
 		if diff := cmp.Diff(&gotTrains, &tc.trains, protocmp.Transform()); diff != "" {
 			t.Errorf("GTFS realtime feed got != want, diff=%s", diff)
 		}
+
+		// Ensure that the stationToStopId map contains the station
+		stationToStopId, err := client.GetStationToStopId(ctx)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if _, ok := stationToStopId[tc.station]; !ok {
+			t.Errorf("stationToStopId does not contain station %v", tc.station)
+		}
+
+		// Ensure that the routeToRouteId map contains the routes
+		routeToRouteId, err := client.GetRouteToRouteId(ctx)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		for _, train := range tc.trains {
+			if _, ok := routeToRouteId[train.Route]; !ok {
+				t.Errorf("routeToRouteId does not contain route %v", train.Route)
+			}
+		}
 	}
 }
 
