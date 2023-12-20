@@ -4,13 +4,8 @@ managed:
   go_package_prefix:
     default: github.com/jamespfennell/path-train-gtfs-realtime/proto/panynj
     except:
-     - buf.build/googleapis/googleapis
+      - buf.build/googleapis/googleapis
 plugins:
   - name: go
     out: .
     opt: paths=source_relative
-  - name: go-grpc
-    out: .
-    opt:
-      - paths=source_relative
-      - require_unimplemented_servers=false

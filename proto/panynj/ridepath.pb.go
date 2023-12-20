@@ -20,11 +20,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Contains information about all incoming trains at all stations
 type RidePathResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// All station data.
 	Results []*RidePathResponse_Results `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
 }
 
@@ -67,17 +69,25 @@ func (x *RidePathResponse) GetResults() []*RidePathResponse_Results {
 	return nil
 }
 
+// Information about a single train
 type RidePathResponse_Messages struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Target             string `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	SecondsToArrival   string `protobuf:"bytes,2,opt,name=secondsToArrival,proto3" json:"secondsToArrival,omitempty"`
+	// The target station
+	Target string `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	// The estimated number of seconds until the train arrives
+	SecondsToArrival string `protobuf:"bytes,2,opt,name=secondsToArrival,proto3" json:"secondsToArrival,omitempty"`
+	// A formatted message to display to the user
 	ArrivalTimeMessage string `protobuf:"bytes,3,opt,name=arrivalTimeMessage,proto3" json:"arrivalTimeMessage,omitempty"`
-	LineColor          string `protobuf:"bytes,4,opt,name=lineColor,proto3" json:"lineColor,omitempty"`
-	HeadSign           string `protobuf:"bytes,5,opt,name=headSign,proto3" json:"headSign,omitempty"`
-	LastUpdated        string `protobuf:"bytes,6,opt,name=lastUpdated,proto3" json:"lastUpdated,omitempty"`
+	// The color associated with the route. Can be multiple colors
+	// delimited by commas (e.g. the for JSQ-33-HOB).
+	LineColor string `protobuf:"bytes,4,opt,name=lineColor,proto3" json:"lineColor,omitempty"`
+	// The headsign for the trip
+	HeadSign string `protobuf:"bytes,5,opt,name=headSign,proto3" json:"headSign,omitempty"`
+	// An ISO 8601 formatted string for when this data was last updated.
+	LastUpdated string `protobuf:"bytes,6,opt,name=lastUpdated,proto3" json:"lastUpdated,omitempty"`
 }
 
 func (x *RidePathResponse_Messages) Reset() {
@@ -154,12 +164,15 @@ func (x *RidePathResponse_Messages) GetLastUpdated() string {
 	return ""
 }
 
+// A labeled direction  with associated trains.
 type RidePathResponse_Destinations struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Label    string                       `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	// The direction of the trains (either 'ToNJ' to 'ToNY')
+	Label string `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	// All trains headed to the above direction.
 	Messages []*RidePathResponse_Messages `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
 }
 
@@ -209,13 +222,16 @@ func (x *RidePathResponse_Destinations) GetMessages() []*RidePathResponse_Messag
 	return nil
 }
 
+// All destinations for a given station.
 type RidePathResponse_Results struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ConsideredStation string                           `protobuf:"bytes,1,opt,name=consideredStation,proto3" json:"consideredStation,omitempty"`
-	Destinations      []*RidePathResponse_Destinations `protobuf:"bytes,2,rep,name=destinations,proto3" json:"destinations,omitempty"`
+	// The station.
+	ConsideredStation string `protobuf:"bytes,1,opt,name=consideredStation,proto3" json:"consideredStation,omitempty"`
+	// Destinations associated with the station.
+	Destinations []*RidePathResponse_Destinations `protobuf:"bytes,2,rep,name=destinations,proto3" json:"destinations,omitempty"`
 }
 
 func (x *RidePathResponse_Results) Reset() {
