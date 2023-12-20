@@ -34,7 +34,6 @@ type cachedContent struct {
 // PaNyNjClient is a source client that gets data from the Port Authority of New York and New Jersey.
 // It is what is used to power the official realtime schedules on the PATH website: https://www.panynj.gov/path/en/index.html
 type PaNyNjClient struct {
-	timeoutPeriod time.Duration
 	httpClient    HttpClient
 	clock         clock.Clock
 	cachedContent *cachedContent
