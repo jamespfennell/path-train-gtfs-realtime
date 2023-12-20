@@ -6,7 +6,7 @@ and outputs a feed of the data in the GTFS Realtime format.
 Some important notes:
 
 - **You don't need to run the application yourself.**
-    The GTFS Realtime feed produced by this software can be accessed at 
+    The GTFS Realtime feed produced by this software can be accessed at
     [`https://path.transitdata.nyc/gtfsrt`](https://path.transitdata.nyc/gtfsrt).
     It's updated every 5 seconds.
 
@@ -19,7 +19,7 @@ Some important notes:
   Realtime feed has some big missing pieces:
   - There is no trip data: all the Port Authority communicates are stops, and arrival times at those stops.
     There is no easy way to connect arrival times for the same train at multiple stops.
-    So, in the GTFS Realtime feed, the "trips" are dummy trips with a random ID and a single 
+    So, in the GTFS Realtime feed, the "trips" are dummy trips with a random ID and a single
     stop time update. This should be sufficient for consumers that want to show arrival times at stops,
     but of course prevents other uses like tracking trains through the system.
   - The GTFS Static feed describes all the tracks/platforms at each of the PATH stations
@@ -35,26 +35,29 @@ The application is an HTTP server with the
 In the background, the program periodically retrieves data from the Razza API
     and updates the feed.
 By default, this update occurs every 5 seconds.
- 
+
 There are a couple flags that can be passed to the binary:
 
 - `--port <int>`: the port to bind the HTTP server to (default `8080`)
- 
+
 - `--timeout_period <duration>`:
-    	the maximum duration to wait for a response from the source API (default 5s)
+        the maximum duration to wait for a response from the source API (default 5s)
 
 - `--update_period <duration>`:
-    	how often to update the feed (default 5s).
+        how often to update the feed (default 5s).
     Remember that the more frequently you update, the more stress you place
     on the source API, so be nice.
 
 - `--use_http_source_api`
     use the HTTP source API instead of the default gRPC API.
-    
+
+- `--use_panynj_api`:
+    use the PANYNJ API.
+
 ### Running using Docker
 
 The CI process (using Github actions) builds a Docker image and stores it
-at the `jamespfennell/path-train-gtfs-realtime:latest` 
+at the `jamespfennell/path-train-gtfs-realtime:latest`
 [tag on Docker Hub](https://hub.docker.com/repository/docker/jamespfennell/path-train-gtfs-realtime).
 You can also build the Docker image locally by running `docker build .` in the
 root of the repo.
@@ -78,7 +81,7 @@ When doing dev work it is generally necessary to run the application on "bare me
 which you can do simply with  `go run cmd/pathgtfsrt.go`.
 
 The source gRPC API and the GTFS Realtime format are both built
-on `proto` files. 
+on `proto` files.
 Getting these `proto` files and compiling them to `go` files
 is a bit of a pain, so they're kept in source control.
 To regenerate them, it's probably just simplest to use the Docker build process.
@@ -109,7 +112,7 @@ released under the MIT License (see `LICENSE`).
 [mrazza/path-data Github repo](https://github.com/mrazza/path-data),
 are released under the MIT License and are copyright Matthew Razza.
 
-- The `proto` files in the `gtfsrt` directory are sourced from the 
+- The `proto` files in the `gtfsrt` directory are sourced from the
 [google/tranist Github repo](https://github.com/google/transit),
 are released under the Apache License 2.0 and are copyright Google Inc.
 
