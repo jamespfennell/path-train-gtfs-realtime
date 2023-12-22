@@ -18,7 +18,6 @@ COPY . .
 
 RUN cd proto/gtfsrt && buf generate
 RUN cd proto/sourceapi && buf generate
-RUN cd proto/panynj && buf generate
 RUN go build cmd/pathgtfsrt.go
 RUN go test ./...
 

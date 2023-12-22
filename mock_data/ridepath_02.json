@@ -1,0 +1,603 @@
+{
+  "results": [
+    {
+      "consideredStation": "NWK",
+      "destinations": [
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "WTC",
+              "secondsToArrival": "232",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "832",
+              "arrivalTimeMessage": "14 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "HAR",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "NWK",
+              "secondsToArrival": "217",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "NWK",
+              "secondsToArrival": "1088",
+              "arrivalTimeMessage": "18 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "WTC",
+              "secondsToArrival": "344",
+              "arrivalTimeMessage": "6 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:57.869032-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "944",
+              "arrivalTimeMessage": "16 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:57.869032-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "JSQ",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "NWK",
+              "secondsToArrival": "408",
+              "arrivalTimeMessage": "7 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:47.905034-05:00"
+            },
+            {
+              "target": "NWK",
+              "secondsToArrival": "834",
+              "arrivalTimeMessage": "14 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:47.905034-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "367",
+              "arrivalTimeMessage": "6 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "374",
+              "arrivalTimeMessage": "6 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "1009",
+              "arrivalTimeMessage": "17 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "1087",
+              "arrivalTimeMessage": "18 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "GRV",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "NWK",
+              "secondsToArrival": "103",
+              "arrivalTimeMessage": "2 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "446",
+              "arrivalTimeMessage": "8 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:41:52.813168-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "WTC",
+              "secondsToArrival": "204",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "669",
+              "arrivalTimeMessage": "11 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "NEW",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "JSQ",
+              "secondsToArrival": "231",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "HOB",
+              "secondsToArrival": "614",
+              "arrivalTimeMessage": "10 min",
+              "lineColor": "65C100",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "44",
+              "arrivalTimeMessage": "1 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "674",
+              "arrivalTimeMessage": "11 min",
+              "lineColor": "65C100",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "EXP",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "299",
+              "arrivalTimeMessage": "5 min",
+              "lineColor": "65C100",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            },
+            {
+              "target": "NWK",
+              "secondsToArrival": "384",
+              "arrivalTimeMessage": "7 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "WTC",
+              "secondsToArrival": "239",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "65C100",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "374",
+              "arrivalTimeMessage": "6 min",
+              "lineColor": "D93A30",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "HOB",
+      "destinations": [
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "32",
+              "arrivalTimeMessage": "1 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "452",
+              "arrivalTimeMessage": "8 min",
+              "lineColor": "65C100",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "932",
+              "arrivalTimeMessage": "16 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "WTC",
+              "secondsToArrival": "1172",
+              "arrivalTimeMessage": "20 min",
+              "lineColor": "65C100",
+              "headSign": "World Trade Center",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "WTC",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "47",
+              "arrivalTimeMessage": "1 min",
+              "lineColor": "65C100",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:42:12.868217-05:00"
+            },
+            {
+              "target": "NWK",
+              "secondsToArrival": "107",
+              "arrivalTimeMessage": "2 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:42:12.868217-05:00"
+            },
+            {
+              "target": "NWK",
+              "secondsToArrival": "707",
+              "arrivalTimeMessage": "12 min",
+              "lineColor": "D93A30",
+              "headSign": "Newark",
+              "lastUpdated": "2023-12-18T20:42:12.868217-05:00"
+            },
+            {
+              "target": "HOB",
+              "secondsToArrival": "767",
+              "arrivalTimeMessage": "13 min",
+              "lineColor": "65C100",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:42:12.868217-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "CHR",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "380",
+              "arrivalTimeMessage": "6 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "465",
+              "arrivalTimeMessage": "8 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "536",
+              "arrivalTimeMessage": "9 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "621",
+              "arrivalTimeMessage": "11 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:42.854056-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "09S",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "299",
+              "arrivalTimeMessage": "5 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "384",
+              "arrivalTimeMessage": "7 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:41:32.933609-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "634",
+              "arrivalTimeMessage": "11 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "719",
+              "arrivalTimeMessage": "12 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "14S",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "180",
+              "arrivalTimeMessage": "3 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:42:02.869032-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "265",
+              "arrivalTimeMessage": "5 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:42:02.869032-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "2512",
+              "arrivalTimeMessage": "42 min",
+              "lineColor": "4D92FB,FF9900",
+              "headSign": "Journal Square via Hoboken",
+              "lastUpdated": "2023-12-18T20:42:02.869032-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "22",
+              "arrivalTimeMessage": "1 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:57.813168-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "709",
+              "arrivalTimeMessage": "12 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:57.813168-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "23S",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "121",
+              "arrivalTimeMessage": "2 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "206",
+              "arrivalTimeMessage": "4 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:41:27.941258-05:00"
+            }
+          ]
+        },
+        {
+          "label": "ToNY",
+          "messages": [
+            {
+              "target": "33S",
+              "secondsToArrival": "80",
+              "arrivalTimeMessage": "1 min",
+              "lineColor": "FF9900",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:47.905034-05:00"
+            },
+            {
+              "target": "33S",
+              "secondsToArrival": "165",
+              "arrivalTimeMessage": "3 min",
+              "lineColor": "4D92FB",
+              "headSign": "33rd Street",
+              "lastUpdated": "2023-12-18T20:41:47.905034-05:00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "consideredStation": "33S",
+      "destinations": [
+        {
+          "label": "ToNJ",
+          "messages": [
+            {
+              "target": "HOB",
+              "secondsToArrival": "0",
+              "arrivalTimeMessage": "0 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "0",
+              "arrivalTimeMessage": "0 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            },
+            {
+              "target": "HOB",
+              "secondsToArrival": "592",
+              "arrivalTimeMessage": "10 min",
+              "lineColor": "4D92FB",
+              "headSign": "Hoboken",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            },
+            {
+              "target": "JSQ",
+              "secondsToArrival": "712",
+              "arrivalTimeMessage": "12 min",
+              "lineColor": "FF9900",
+              "headSign": "Journal Square",
+              "lastUpdated": "2023-12-18T20:42:07.827997-05:00"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

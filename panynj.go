@@ -12,7 +12,6 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	panynj "github.com/jamespfennell/path-train-gtfs-realtime/proto/panynj"
 	sourceapi "github.com/jamespfennell/path-train-gtfs-realtime/proto/sourceapi"
 )
 
@@ -69,8 +68,35 @@ var panynjLabelToDirection = map[string]sourceapi.Direction{
 	"TONJ": sourceapi.Direction_TO_NJ,
 }
 
-func NewPaNyNjSourceClient(httoClient HttpClient, clock clock.Clock) *PaNyNjClient {
-	return &PaNyNjClient{httpClient: httoClient, clock: clock}
+// RidePathResponse contains information about all incoming trains at all stations
+type RidePathResponse struct {
+	Results []Result `json:"results"`
+}
+
+// Result represents all destinations for a given station
+type Result struct {
+	ConsideredStation string        `json:"consideredStation"`
+	Destinations      []Destination `json:"destinations"`
+}
+
+// Destination is a labeled direction with associated trains
+type Destination struct {
+	Label    string    `json:"label"`
+	Messages []Message `json:"messages"`
+}
+
+// Message contains information about a single train
+type Message struct {
+	Target             string `json:"target"`
+	SecondsToArrival   string `json:"secondsToArrival"`
+	ArrivalTimeMessage string `json:"arrivalTimeMessage"`
+	LineColor          string `json:"lineColor"`
+	HeadSign           string `json:"headSign"`
+	LastUpdated        string `json:"lastUpdated"`
+}
+
+func NewPaNyNjSourceClient(httpClient HttpClient, clock clock.Clock) *PaNyNjClient {
+	return &PaNyNjClient{httpClient: httpClient, clock: clock}
 }
 
 func (client *PaNyNjClient) GetTrainsAtStation(_ context.Context, station sourceapi.Station) ([]Train, error) {
@@ -78,25 +104,25 @@ func (client *PaNyNjClient) GetTrainsAtStation(_ context.Context, station source
 	if err != nil {
 		return nil, err
 	}
-	response := panynj.RidePathResponse{}
+	response := RidePathResponse{}
 	err = json.Unmarshal(realtimeApiContent, &response)
 	if err != nil {
 		return nil, err
 	}
 	var trains []Train
-	for _, result := range response.GetResults() {
-		consideredStation := client.convertStationAsStringToStation(result.GetConsideredStation())
+	for _, result := range response.Results {
+		consideredStation := client.convertStationAsStringToStation(result.ConsideredStation)
 		if consideredStation != station {
 			continue
 		}
-		for _, destination := range result.GetDestinations() {
-			label := destination.GetLabel()
-			for _, message := range destination.GetMessages() {
+		for _, destination := range result.Destinations {
+			for _, message := range destination.Messages {
+				lastUpdated := client.convertApiLastUpdatedTimeStringToTimestamp(message.LastUpdated)
 				upcomingTrain := sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{
-					Route:            client.convertLineColorToRoute(message.GetLineColor()),
-					Direction:        client.convertDirectionAsStringToDirection(label),
-					ProjectedArrival: client.convertApiSecondsToArrivalAsStringToTimestamp(message.GetSecondsToArrival()),
-					LastUpdated:      client.convertApiLastUpdatedTimeStringToTimestamp(message.GetLastUpdated()),
+					Route:            client.convertLineColorToRoute(message.LineColor),
+					Direction:        client.convertDirectionAsStringToDirection(destination.Label),
+					ProjectedArrival: client.convertApiSecondsToArrivalAsStringToTimestamp(lastUpdated, message.SecondsToArrival),
+					LastUpdated:      lastUpdated,
 				}
 				trains = append(trains, &upcomingTrain)
 			}
@@ -147,13 +173,12 @@ func (client *PaNyNjClient) convertApiLastUpdatedTimeStringToTimestamp(timeStrin
 	return &value
 }
 
-func (client *PaNyNjClient) convertApiSecondsToArrivalAsStringToTimestamp(secondsToArrivalAsString string) *timestamp.Timestamp {
+func (client *PaNyNjClient) convertApiSecondsToArrivalAsStringToTimestamp(lastUpdated *timestamp.Timestamp, secondsToArrivalAsString string) *timestamp.Timestamp {
 	secondsToArrival, err := strconv.ParseInt(secondsToArrivalAsString, 10, 64)
 	if err != nil {
 		return nil
 	}
-	nowSeconds := client.clock.Now().Unix()
-	return &timestamp.Timestamp{Seconds: nowSeconds + secondsToArrival}
+	return &timestamp.Timestamp{Seconds: lastUpdated.Seconds + secondsToArrival}
 }
 
 // Get the raw bytes from an endpoint in the API.
