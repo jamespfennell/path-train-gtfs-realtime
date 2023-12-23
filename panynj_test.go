@@ -469,6 +469,20 @@ func TestGetStationToStopId(t *testing.T) {
 
 }
 
+// This test ensures that the client can handle fractional second precision
+// Of 5 and 6 digits. The file 'mock_data/ridepath_03.json' contains a real
+// response from the PATH API with 5 digit fractional second precision that
+// was causing the client to crash previously.
+func TestDataWith5DigitFractionalSecondPrecision(t *testing.T) {
+	jsonPath := "mock_data/ridepath_03.json"
+	client, _ := NewClientWithMockedHttp(&jsonPath, clock.New())
+	ctx := context.Background()
+	_, err := client.GetTrainsAtStation(ctx, sourceapi.Station_FOURTEENTH_STREET)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
 func TestGetRouteToRouteId(t *testing.T) {
 	client, _ := NewClientWithMockedHttp(nil, clock.New())
 	ctx := context.Background()

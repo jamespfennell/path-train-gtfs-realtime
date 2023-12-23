@@ -117,7 +117,10 @@ func (client *PaNyNjClient) GetTrainsAtStation(_ context.Context, station source
 		}
 		for _, destination := range result.Destinations {
 			for _, message := range destination.Messages {
-				lastUpdated := client.convertApiLastUpdatedTimeStringToTimestamp(message.LastUpdated)
+				lastUpdated, err := client.convertApiLastUpdatedTimeStringToTimestamp(message.LastUpdated)
+				if err != nil {
+					return nil, err
+				}
 				upcomingTrain := sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{
 					Route:            client.convertLineColorToRoute(message.LineColor),
 					Direction:        client.convertDirectionAsStringToDirection(destination.Label),
@@ -127,6 +130,14 @@ func (client *PaNyNjClient) GetTrainsAtStation(_ context.Context, station source
 				trains = append(trains, &upcomingTrain)
 			}
 		}
+	}
+
+	if station == sourceapi.Station_FOURTEENTH_STREET {
+		println("Found trains at 14th street")
+		for _, train := range trains {
+			println(train.Route, train.Direction, train.ProjectedArrival.AsTime().String())
+		}
+
 	}
 	return trains, nil
 }
@@ -163,14 +174,14 @@ func (client *PaNyNjClient) convertLineColorToRoute(lineColor string) sourceapi.
 	return route
 }
 
-func (client *PaNyNjClient) convertApiLastUpdatedTimeStringToTimestamp(timeString string) *timestamp.Timestamp {
-	const layout = "2006-01-02T15:04:05.000000-07:00"
+func (client *PaNyNjClient) convertApiLastUpdatedTimeStringToTimestamp(timeString string) (*timestamp.Timestamp, error) {
+	const layout = "2006-01-02T15:04:05.999999-07:00"
 	timeObj, err := time.Parse(layout, timeString)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	value := timestamp.Timestamp{Seconds: timeObj.Unix()}
-	return &value
+	return &value, nil
 }
 
 func (client *PaNyNjClient) convertApiSecondsToArrivalAsStringToTimestamp(lastUpdated *timestamp.Timestamp, secondsToArrivalAsString string) *timestamp.Timestamp {
