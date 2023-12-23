@@ -25,6 +25,11 @@ var port = flag.Int("port", 8080, "the port to bind the HTTP server to")
 var updatePeriod = flag.Duration("update_period", 5*time.Second, "how often to update the feed")
 var timeoutPeriod = flag.Duration("timeout_period", 5*time.Second, "maximum duration to wait for a response from the source API")
 var useHTTPSourceAPI = flag.Bool("use_http_source_api", false, "use the HTTP source API instead of the default gRPC API")
+var usePanynjAPI = flag.Bool("use_panynj_api", false, "use the Panynj API instead of the default path-data API")
+
+const (
+	minPanynjUpdatePeriod = 15 * time.Second
+)
 
 var numUpdatesCounter = promauto.NewCounter(
 	prometheus.CounterOpts{
@@ -69,7 +74,16 @@ func main() {
 
 func run(ctx context.Context) error {
 	var sourceClient pathgtfsrt.SourceClient
-	if *useHTTPSourceAPI {
+	if *usePanynjAPI {
+		fmt.Println("Source API: PANYNJ")
+		httpClient := &http.Client{Timeout: *timeoutPeriod}
+		sourceClient = pathgtfsrt.NewPaNyNjSourceClient(httpClient, clock.New())
+		// Update duration should not exceed 15 seconds
+		if *updatePeriod < minPanynjUpdatePeriod {
+			fmt.Printf("Update period too short for Panynj API; setting to %f seconds\n", minPanynjUpdatePeriod.Seconds())
+			*updatePeriod = minPanynjUpdatePeriod
+		}
+	} else if *useHTTPSourceAPI {
 		fmt.Println("Source API: HTTP")
 		sourceClient = pathgtfsrt.NewHttpSourceClient(*timeoutPeriod)
 	} else {
