@@ -21,6 +21,7 @@ RUN cd proto/sourceapi && buf generate
 RUN go build cmd/pathgtfsrt.go
 RUN go test ./...
 
-FROM debian:buster
+# We use this buildpack image because it already has SSL certificates installed
+FROM buildpack-deps:buster-curl
 COPY --from=build /build/pathgtfsrt /usr/local/bin/
 ENTRYPOINT ["pathgtfsrt"]
