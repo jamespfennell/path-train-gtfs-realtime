@@ -85,7 +85,8 @@ func run(ctx context.Context) error {
 		}
 	} else if *useHTTPSourceAPI {
 		fmt.Println("Source API: HTTP")
-		sourceClient = pathgtfsrt.NewHttpSourceClient(*timeoutPeriod)
+		httpClient := &http.Client{Timeout: *timeoutPeriod}
+		sourceClient = pathgtfsrt.NewHttpSourceClient(httpClient)
 	} else {
 		fmt.Println("Source API: gRPC")
 		grpcClient, err := pathgtfsrt.NewGrpcSourceClient(*timeoutPeriod)

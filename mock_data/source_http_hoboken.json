@@ -1,0 +1,48 @@
+{
+  "upcomingTrains": [
+    {
+      "lineName": "33rd Street via Hoboken",
+      "headsign": "33rd Street via Hoboken",
+      "route": "JSQ_33_HOB",
+      "routeDisplayName": "Journal Square - 33rd Street (via Hoboken)",
+      "direction": "TO_NY",
+      "lineColors": ["#4D92FB", "#FF9900"],
+      "status": "ON_TIME",
+      "projectedArrival": "2023-12-23T05:36:15Z",
+      "lastUpdated": "2023-12-23T05:35:44Z"
+    },
+    {
+      "lineName": "33rd Street via Hoboken",
+      "headsign": "33rd Street via Hoboken",
+      "route": "JSQ_33_HOB",
+      "routeDisplayName": "Journal Square - 33rd Street (via Hoboken)",
+      "direction": "TO_NY",
+      "lineColors": ["#4D92FB", "#FF9900"],
+      "status": "ON_TIME",
+      "projectedArrival": "2023-12-23T06:01:30Z",
+      "lastUpdated": "2023-12-23T05:35:44Z"
+    },
+    {
+      "lineName": "Journal Square via Hoboken",
+      "headsign": "Journal Square via Hoboken",
+      "route": "JSQ_33_HOB",
+      "routeDisplayName": "33rd Street (via Hoboken) - Journal Square",
+      "direction": "TO_NJ",
+      "lineColors": ["#4D92FB", "#FF9900"],
+      "status": "ON_TIME",
+      "projectedArrival": "2023-12-23T05:36:15Z",
+      "lastUpdated": "2023-12-23T05:35:44Z"
+    },
+    {
+      "lineName": "Journal Square via Hoboken",
+      "headsign": "Journal Square via Hoboken",
+      "route": "JSQ_33_HOB",
+      "routeDisplayName": "33rd Street (via Hoboken) - Journal Square",
+      "direction": "TO_NJ",
+      "lineColors": ["#4D92FB", "#FF9900"],
+      "status": "ON_TIME",
+      "projectedArrival": "2023-12-23T06:02:44Z",
+      "lastUpdated": "2023-12-23T05:35:44Z"
+    }
+  ]
+}

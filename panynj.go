@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,10 +18,6 @@ const (
 	paNyNjApiUrl      = "https://www.panynj.gov/bin/portauthority/ridepath.json"
 	cacheValidityTime = 10 * time.Second
 )
-
-type HttpClient interface {
-	Get(url string) (resp *http.Response, err error)
-}
 
 type cachedContent struct {
 	timestamp time.Time

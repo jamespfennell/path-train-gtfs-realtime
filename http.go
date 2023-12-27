@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -22,11 +21,11 @@ const (
 
 // HttpSourceClient is a source client that gets data using the Razza HTTP API.
 type HttpSourceClient struct {
-	timeoutPeriod time.Duration
+	httpClient    HttpClient
 }
 
-func NewHttpSourceClient(timeout time.Duration) *HttpSourceClient {
-	return &HttpSourceClient{timeoutPeriod: timeout}
+func NewHttpSourceClient(httpClient HttpClient) *HttpSourceClient {
+	return &HttpSourceClient{httpClient: httpClient}
 }
 
 func (client *HttpSourceClient) GetTrainsAtStation(_ context.Context, station sourceapi.Station) ([]Train, error) {
@@ -35,6 +34,7 @@ func (client *HttpSourceClient) GetTrainsAtStation(_ context.Context, station so
 		LastUpdated       string
 		RouteAsString     string `json:"route"`
 		DirectionAsString string `json:"direction"`
+		LineName          string `json:"lineName"`
 	}
 	type jsonGetUpcomingTrainsResponse struct {
 		Trains []jsonUpcomingTrain `json:"upcomingTrains"`
@@ -53,10 +53,12 @@ func (client *HttpSourceClient) GetTrainsAtStation(_ context.Context, station so
 	for _, rawUpcomingTrain := range response.Trains {
 		upcomingTrain := sourceapi.GetUpcomingTrainsResponse_UpcomingTrain{
 			Route:            client.convertRouteAsStringToRoute(rawUpcomingTrain.RouteAsString),
+			LineName:         rawUpcomingTrain.LineName,
 			Direction:        client.convertDirectionAsStringToDirection(rawUpcomingTrain.DirectionAsString),
 			ProjectedArrival: client.convertApiTimeStringToTimestamp(rawUpcomingTrain.ProjectedArrival),
 			LastUpdated:      client.convertApiTimeStringToTimestamp(rawUpcomingTrain.LastUpdated),
 		}
+		applyRouteQaToTrain(&upcomingTrain)
 		trains = append(trains, &upcomingTrain)
 	}
 	return trains, nil
@@ -132,8 +134,7 @@ func (client *HttpSourceClient) convertApiTimeStringToTimestamp(timeString strin
 
 // Get the raw bytes from an endpoint in the API.
 func (client HttpSourceClient) getContent(endpoint string) (bytes []byte, err error) {
-	httpClient := &http.Client{Timeout: client.timeoutPeriod}
-	resp, err := httpClient.Get(apiBaseUrl + endpoint)
+	resp, err := client.httpClient.Get(apiBaseUrl + endpoint)
 	if err != nil {
 		return
 	}
