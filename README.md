@@ -32,9 +32,14 @@ Some important notes:
 
 The application is an HTTP server with the
     GTFS Realtime feed available at the `/gtfsrt` path.
-In the background, the program periodically retrieves data from the Razza API
+    
+There are 2 options for the data source to use for PATH arrival times:
+1. The [path-data](https://github.com/mrazza/path-data) API (default), which fetches the data that the RidePATH app uses.
+2. The PANYNJ JSON API, which powers the [PATH train schedules web page](https://www.panynj.gov/path/en/index.html).
+
+In the background, the program periodically retrieves data from the selected API
     and updates the feed.
-By default, this update occurs every 5 seconds.
+By default, this update occurs every 5 seconds for the path-data API and every 15 seconds for the PANYNJ JSON API.
 
 There are a couple flags that can be passed to the binary:
 
@@ -49,10 +54,10 @@ There are a couple flags that can be passed to the binary:
     on the source API, so be nice.
 
 - `--use_http_source_api`
-    use the HTTP source API instead of the default gRPC API.
+    use the HTTP path-data API instead of the default gRPC API.
 
 - `--use_panynj_api`:
-    use the PANYNJ API.
+    use the PANYNJ JSON API instead of the path-data API.
 
 ### Running using Docker
 
