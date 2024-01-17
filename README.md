@@ -46,10 +46,10 @@ There are a couple flags that can be passed to the binary:
 - `--port <int>`: the port to bind the HTTP server to (default `8080`)
 
 - `--timeout_period <duration>`:
-        the maximum duration to wait for a response from the source API (default 5s for the path-data API, 15s for the PANYNJ API)
+        the maximum duration to wait for a response from the source API (default 5s)
 
 - `--update_period <duration>`:
-        how often to update the feed (default 5s).
+        how often to update the feed (default 5s for the path-data API, 15s for the PANYNJ API).
     Remember that the more frequently you update, the more stress you place
     on the source API, so be nice.
 
