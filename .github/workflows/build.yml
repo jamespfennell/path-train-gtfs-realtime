@@ -38,5 +38,7 @@ jobs:
           tags: |
             jamespfennell/path-train-gtfs-realtime:build-${{ github.run_number }}
             jamespfennell/path-train-gtfs-realtime:latest
+          build-args: |
+            "BUILD_NUMBER=${{ github.run_number }}"
           # Only push to Docker Hub if this workflow is a push to master
           push: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}

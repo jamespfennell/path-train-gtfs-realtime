@@ -18,7 +18,8 @@ COPY . .
 
 RUN cd proto/gtfsrt && buf generate
 RUN cd proto/sourceapi && buf generate
-RUN go build cmd/pathgtfsrt.go
+ARG BUILD_NUMBER
+RUN go build --ldflags "-X github.com/jamespfennell/path-train-gtfs-realtime.BuildNumber=${BUILD_NUMBER}" cmd/pathgtfsrt.go
 RUN go test ./...
 
 # We use this buildpack image because it already has SSL certificates installed

@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"time"
@@ -110,16 +109,7 @@ func run(ctx context.Context) error {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("index.html").Parse(indexHTMLPage)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = tmpl.Execute(w, "data goes here")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	fmt.Fprintf(w, indexHTMLPage, pathgtfsrt.BuildNumber)
 }
 
 func recordUpdate(msg *gtfs.FeedMessage, errs []error) {

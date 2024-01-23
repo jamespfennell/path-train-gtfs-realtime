@@ -18,6 +18,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// Set via flags on Go build
+var BuildNumber string
+
 // Train contains data about a PATH train at a specific station.
 type Train *sourceapi.GetUpcomingTrainsResponse_UpcomingTrain
 
