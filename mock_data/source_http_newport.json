@@ -1,0 +1,15 @@
+{
+  "upcomingTrains": [
+    {
+      "lineName": "33rd Street",
+      "headsign": "33rd Street",
+      "route": "JSQ_33_HOB",
+      "routeDisplayName": "Journal Square - 33rd Street (via Hoboken)",
+      "direction": "TO_NY",
+      "lineColors": ["#FF9900"],
+      "status": "ON_TIME",
+      "projectedArrival": "2023-12-27T00:09:21Z",
+      "lastUpdated": "2023-12-27T00:01:24Z"
+    }
+  ]
+}

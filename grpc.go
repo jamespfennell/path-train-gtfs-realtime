@@ -73,6 +73,7 @@ func (client *GrpcSourceClient) GetTrainsAtStation(ctx context.Context, station 
 	}
 	var trains []Train
 	for _, train := range response.UpcomingTrains {
+		applyRouteQaToTrain(train)
 		trains = append(trains, train)
 	}
 	return trains, nil
