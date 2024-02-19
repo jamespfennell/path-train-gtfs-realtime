@@ -127,13 +127,6 @@ func (client *PaNyNjClient) GetTrainsAtStation(_ context.Context, station source
 		}
 	}
 
-	if station == sourceapi.Station_FOURTEENTH_STREET {
-		println("Found trains at 14th street")
-		for _, train := range trains {
-			println(train.Route, train.Direction, train.ProjectedArrival.AsTime().String())
-		}
-
-	}
 	return trains, nil
 }
 
