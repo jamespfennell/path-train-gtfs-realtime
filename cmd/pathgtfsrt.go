@@ -26,6 +26,21 @@ var timeoutPeriod = flag.Duration("timeout_period", 5*time.Second, "maximum dura
 var useHTTPSourceAPI = flag.Bool("use_http_source_api", false, "use the HTTP source API instead of the default gRPC API")
 var usePanynjAPI = flag.Bool("use_panynj_api", false, "use the Panynj API instead of the default path-data API")
 
+func formatCommandLineArgs() string {
+	return fmt.Sprintf("port=%d, update_period=%s, timeout_period=%s, use_http_source_api=%t, use_panynj_api=%t",
+		*port, *updatePeriod, *timeoutPeriod, *useHTTPSourceAPI, *usePanynjAPI)
+}
+
+func getApiName() string {
+	if *usePanynjAPI {
+		return "Panynj API"
+	} else if *useHTTPSourceAPI {
+		return "HTTP path-data API"
+	} else {
+		return "gRPC path-data API"
+	}
+}
+
 const (
 	minPanynjUpdatePeriod = 15 * time.Second
 )
@@ -109,7 +124,10 @@ func run(ctx context.Context) error {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, indexHTMLPage, pathgtfsrt.BuildNumber)
+	fmt.Fprintf(w, indexHTMLPage,
+		pathgtfsrt.BuildNumber,
+		formatCommandLineArgs(),
+		getApiName())
 }
 
 func recordUpdate(msg *gtfs.FeedMessage, errs []error) {

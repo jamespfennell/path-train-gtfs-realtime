@@ -1,39 +1,44 @@
 <!doctype html>
 
 <html lang="en">
-<head>
-    <meta charset="utf-8">
+  <head>
+    <meta charset="utf-8" />
     <title>PATH Train GTFS Realtime</title>
 
-<style>
-body {
-  font-family: Helvetica, sans-serif;
-  line-height: 1.4em;
-}
+    <style>
+      body {
+        font-family: Helvetica, sans-serif;
+        line-height: 1.4em;
+      }
 
-h1 {
-  text-align: center;
-}
-ul {
-	font-size: 1.2em;
-}
+      h1 {
+        text-align: center;
+      }
+      ul {
+        font-size: 1.2em;
+      }
 
-li {
-	margin: 8px; 
-}
+      li {
+        margin: 8px;
+      }
+    </style>
+  </head>
 
-</style>
-</head>
-
-<body>
-<div style="width: 600px; margin: 10px auto;">
-	<h1>PATH Train GTFS Realtime</h1>
-	<ul>
-		<li>Build #%s</li>
-		<li><a href="./gtfsrt">Data feed</a></li>
-		<li><a href="./metrics">Prometheus metrics endpoint</a></li>
-		<li><a href="https://github.com/jamespfennell/path-train-gtfs-realtime/">Github repository</a></li>
-	</ul>
-</div>
-</body>
+  <body>
+    <div style="width: 600px; margin: 10px auto">
+      <h1>PATH Train GTFS Realtime</h1>
+      <ul>
+        <li><b>Build:</b> #%s</li>
+        <li><b>Run arguments:</b> %s</li>
+        <li><b>Source data API:</b> %s</li>
+        <li><a href="./gtfsrt">Data feed</a></li>
+        <li><a href="./metrics">Prometheus metrics endpoint</a></li>
+        <li>
+          <a href="https://github.com/jamespfennell/path-train-gtfs-realtime/"
+            >Github repository</a
+          >
+        </li>
+      </ul>
+    </div>
+  </body>
 </html>
